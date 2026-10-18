@@ -8,7 +8,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 const SOURCE =
   'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson';
-const COUNTRIES = { AUT: 'at', DEU: 'de', CHE: 'ch' };
+const COUNTRIES = { AUT: 'at' };
 const TOLERANCE = 0.01; // degrees, ~1 km
 const MIN_AREA = 0.01; // square degrees; drops small islands
 const OUT = new URL('../src/js/borders.js', import.meta.url);

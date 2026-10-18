@@ -5,7 +5,7 @@ import { snapshot } from './model.js';
 import * as storage from './storage.js';
 import { createChart } from './ui/chart.js';
 import { clock } from './ui/format.js';
-import { renderCredits, renderDays, renderHero, renderNowcast, renderPoint } from './ui/render.js';
+import { renderChartHead, renderCredits, renderDays, renderHero } from './ui/render.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -16,10 +16,26 @@ let loading = false;
 let failed = false;
 let request = 0;
 let radar = null;
+// Chart state: a tapped point, and the day the chart jumped to (if any).
+let point = null;
+let day = null;
 
 if (forecast?.version !== 1 || distanceKm(forecast.location, place) > MOVE_THRESHOLD_KM) forecast = null;
 
-const chart = createChart($('chart'), { onSelect: (point) => view && renderPoint(point, view) });
+const chart = createChart($('chart'), {
+  onSelect(next) {
+    point = next;
+    if (view) renderChartHead(view, { point, day });
+  },
+  onView({ follow, day: next }) {
+    day = next;
+    $('chart-now').hidden = follow;
+    if (view) {
+      renderChartHead(view, { point, day });
+      renderDays(view, day);
+    }
+  },
+});
 
 function renderStatus() {
   $('place').textContent = place.name ?? 'Standort';
@@ -43,8 +59,8 @@ function render() {
   if (!forecast) return;
   view = snapshot(forecast);
   renderHero(view);
-  renderNowcast(view);
-  renderDays(view);
+  renderChartHead(view, { point, day });
+  renderDays(view, day);
   renderCredits(view, place.gps && place.name !== DEFAULT_LOCATION.name);
   chart.update(view);
   radar?.setLocation(place, view.timezone);
@@ -142,9 +158,18 @@ $('reload').addEventListener('click', () => {
   locate();
 });
 $('place-btn').addEventListener('click', () => locate());
+$('chart-now').addEventListener('click', () => chart.showNow());
+$('days').addEventListener('click', (e) => {
+  const button = e.target.closest('[data-day]');
+  if (!button) return;
+  const start = Number(button.dataset.day);
+  if (start === day) chart.showNow();
+  else chart.showDay(start);
+});
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) return;
+  chart.showNow();
   render();
   if (isStale(STALE_MS)) {
     refresh();

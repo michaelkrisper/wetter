@@ -1,26 +1,22 @@
 // Fetches every source that is relevant for a location in parallel and merges
 // them into one forecast. Precision decreases with lead time:
 //
-//   now .. +90 min   nowcast, 5-15 min steps   INCA (AT) / DWD radar (DE) / Open-Meteo 15 min
-//   .. +24 h         hourly                    national model via Open-Meteo, else best match
+//   now .. +90 min   nowcast, 15 min steps     GeoSphere INCA (AT + surroundings), else Open-Meteo 15 min
+//   .. +2.5 days     hourly                    GeoSphere AROME (AT), else Open-Meteo best match
 //   .. +7 days       daily                     Open-Meteo best match (ECMWF, ICON, GFS, ...)
 
 import { NOWCAST_MINUTES } from './config.js';
 import { inBox, MODELS, regionFor } from './regions.js';
-import { DWD_BOX, fetchDwdRadar } from './sources/bright-sky.js';
 import { fetchInca, INCA_BOX } from './sources/geosphere.js';
 import { fetchOpenMeteo } from './sources/open-meteo.js';
 
 export const NOWCASTS = {
   inca: { label: 'INCA', detail: '1 km · 15 min', provider: 'geosphere', box: INCA_BOX, fetch: fetchInca },
-  dwd: { label: 'DWD-Radar', detail: '1 km · 5 min', provider: 'dwd', box: DWD_BOX, fetch: fetchDwdRadar },
   openmeteo: { label: 'Modell', detail: '15 min', provider: 'openmeteo' },
 };
 
 export const PROVIDERS = {
   geosphere: { label: 'GeoSphere Austria', url: 'https://data.hub.geosphere.at' },
-  dwd: { label: 'DWD', url: 'https://www.dwd.de' },
-  meteoswiss: { label: 'MeteoSwiss', url: 'https://www.meteoswiss.admin.ch' },
   openmeteo: { label: 'Open-Meteo', url: 'https://open-meteo.com' },
 };
 

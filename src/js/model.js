@@ -6,7 +6,7 @@
 // first NOWCAST_MINUTES, the hourly model takes over seamlessly (its offset to
 // the nowcast decays instead of jumping), the daily forecast covers the rest.
 
-import { DAYS, HOURLY_SPAN, NOWCAST_MINUTES, WET_THRESHOLD } from './config.js';
+import { DAYS, NOWCAST_MINUTES, WET_THRESHOLD } from './config.js';
 import { isPrecipitation, isShower, precipitationCode, SNOW_CODES } from './weather-codes.js';
 
 const MINUTE = 60_000;
@@ -120,38 +120,70 @@ function currentView(forecast, now, steps, today) {
   };
 }
 
-// Temperature points and precipitation intervals for the next 24 hours: in
-// nowcast resolution up to `until`, hourly after that.
-function timeline(forecast, now, until, current, steps) {
-  const { hourly, minutely, nowcast } = forecast;
-  const end = now + HOURLY_SPAN * HOUR;
-  const fine = nowcast.steps.some((s) => s.temp != null) ? nowcast.steps : minutely;
-  const hourAfter = (time) => hourly.find((h) => h.time >= time) ?? {};
+const blend = (bias, distance) => bias * Math.exp(-distance / (BLEND_HOURS * HOUR));
 
-  const points = [{ ...hourAfter(now), time: now, temp: current.temp, now: true }];
+// Precipitation intervals: the nowcast where it exists, hourly model values
+// around it. The hour that overlaps the nowcast window is cut, not doubled.
+function precipitationBars(hourly, from, steps) {
+  const bars = (steps ?? []).map((s) => ({ start: s.start, end: s.end, rate: s.rate, prob: null }));
+  const [cutFrom, cutTo] = steps ? [steps[0].start, steps.at(-1).end] : [0, 0];
+  for (const h of hourly) {
+    const start = h.time - HOUR;
+    if (h.time <= from || h.precip == null) continue;
+    const bar = { rate: h.precip, prob: h.prob };
+    if (h.time <= cutFrom || start >= cutTo) bars.push({ ...bar, start, end: h.time });
+    else {
+      if (start < cutFrom) bars.push({ ...bar, start, end: cutFrom });
+      if (h.time > cutTo) bars.push({ ...bar, start: cutTo, end: h.time });
+    }
+  }
+  return bars.sort((a, b) => a.start - b.start);
+}
+
+// Temperature from today 00:00 to the last hour: nowcast resolution around
+// now, hourly elsewhere, with the model's offset blended away in both directions.
+function temperaturePoints({ hourly, minutely, nowcast }, now, until, current, from) {
+  const fine = nowcast.steps.some((s) => s.temp != null) ? nowcast.steps : minutely;
+  const hourAt = (time) => hourly.find((h) => h.time >= time) ?? {};
+  const modelNow = interpolate(hourly, now, 'temp');
+  const biasNow = current.temp != null && modelNow != null ? current.temp - modelNow : 0;
+
+  const points = hourly
+    .filter((h) => h.time >= from && h.time < now && h.temp != null)
+    .map((h) => ({ ...h, temp: h.temp + blend(biasNow, now - h.time), past: true }));
+  points.push({ ...hourAt(now), time: now, temp: current.temp, now: true });
   for (const s of fine) {
     if (s.time > now && s.time <= until && s.temp != null) {
-      points.push({ ...hourAfter(s.time), time: s.time, temp: s.temp, rate: s.rate, fine: true });
+      points.push({ ...hourAt(s.time), time: s.time, temp: s.temp, rate: s.rate, fine: true });
     }
   }
   const junction = points.at(-1);
   const modelAtJunction = interpolate(hourly, junction.time, 'temp');
   const bias = junction.temp != null && modelAtJunction != null ? junction.temp - modelAtJunction : 0;
   for (const h of hourly) {
-    if (h.time > junction.time && h.time - HOUR < end && h.temp != null) {
-      const decay = Math.exp(-(h.time - junction.time) / (BLEND_HOURS * HOUR));
-      points.push({ ...h, temp: h.temp + bias * decay });
+    if (h.time > junction.time && h.temp != null) {
+      points.push({ ...h, temp: h.temp + blend(bias, h.time - junction.time) });
     }
   }
+  return points;
+}
 
-  const bars = (steps ?? []).map((s) => ({ start: s.start, end: s.end, rate: s.rate, prob: null }));
-  const barsFrom = steps ? steps.at(-1).end : now;
-  for (const h of hourly) {
-    if (h.time > barsFrom && h.time - HOUR < end && h.precip != null) {
-      bars.push({ start: Math.max(h.time - HOUR, barsFrom), end: h.time, rate: h.precip, prob: h.prob });
-    }
-  }
-  return { from: now, until: points.at(-1).time, points, bars };
+// The whole forecast as one timeline: temperature, precipitation and UV bars,
+// sun and moon events.
+function timeline(forecast, now, until, current, steps, from) {
+  const { hourly, daily } = forecast;
+  const points = temperaturePoints(forecast, now, until, current, from);
+  const end = points.at(-1).time;
+  const events = daily
+    .flatMap((d) => ['sunrise', 'sunset', 'moonrise', 'moonset'].map((kind) => ({ time: d[kind], kind })))
+    .filter(({ time }) => time >= from && time <= end)
+    .sort((a, b) => a.time - b.time);
+  // UV index is an hourly value; its bar is centred on the hour.
+  const uv = hourly
+    .filter((h) => h.time >= from && h.time <= end && h.uv >= 0.5)
+    .map((h) => ({ start: h.time - HOUR / 2, end: h.time + HOUR / 2, uv: h.uv }));
+
+  return { from, until: end, now, points, bars: precipitationBars(hourly, from, steps), uv, events };
 }
 
 export function snapshot(forecast, now = Date.now()) {
@@ -170,9 +202,7 @@ export function snapshot(forecast, now = Date.now()) {
   }
 
   const hours = forecast.hourly.filter((h) => h.time > now);
-  const moonset = [today?.moonset, days[1]?.moonset].find(
-    (t) => t && (!today?.moonrise || t > today.moonrise),
-  );
+  const from = today?.time ?? forecast.hourly[0].time;
 
   return {
     now,
@@ -180,17 +210,9 @@ export function snapshot(forecast, now = Date.now()) {
     providers: forecast.providers,
     fetchedAt: forecast.fetchedAt,
     current,
-    nowcast: steps && { from: now, until, steps },
     outlook: outlook(steps, hours, days, until),
-    timeline: timeline(forecast, now, until, current, steps),
+    timeline: timeline(forecast, now, until, current, steps, from),
     days,
     daylight: forecast.daily.map((d) => [d.sunrise, d.sunset]).filter(([a, b]) => a && b),
-    astro: today && {
-      sunrise: today.sunrise,
-      sunset: today.sunset,
-      moonrise: today.moonrise,
-      moonset: moonset ?? null,
-      moonPhase: today.moonPhase,
-    },
   };
 }

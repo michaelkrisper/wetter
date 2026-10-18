@@ -111,7 +111,7 @@ h2 {
 .view-weather {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
   gap: var(--gap);
   min-height: 0;
   padding: calc(env(safe-area-inset-top) + 8px) 14px 4px;
@@ -228,50 +228,31 @@ h2 {
   font-size: 30px;
 }
 
-.hero-feels,
-.hero-range {
-  font-size: 14px;
-  color: var(--muted);
-}
-
-.hero-range {
-  display: flex;
-  gap: 12px;
-}
-
-.hero-range b {
-  color: var(--text);
-  font-weight: 600;
-}
-
-.stats {
+.hero-facts {
   display: grid;
-  grid-template-columns: repeat(4, auto);
-  justify-content: space-between;
-  margin: 12px 0 0;
-  padding: 10px 2px 0;
-  border-top: 1px solid var(--border);
-}
-
-.stats dt {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  color: var(--faint);
-  letter-spacing: 0.02em;
-}
-
-.stats dd {
+  grid-template-columns: auto auto;
+  justify-content: start;
+  column-gap: 18px;
+  row-gap: 2px;
   margin: 2px 0 0;
   font-size: 14px;
-  font-weight: 500;
+}
+
+.hero-facts div {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   white-space: nowrap;
 }
 
-#moon-icon {
-  display: inline-flex;
+.hero-facts dt {
+  color: var(--faint);
   font-size: 12px;
+}
+
+.hero-facts dd {
+  margin: 0;
+  font-weight: 500;
 }
 
 /* Cards */
@@ -308,67 +289,6 @@ h2 {
   white-space: nowrap;
 }
 
-/* Next 90 minutes */
-
-.nowcast.is-wet h2 {
-  color: var(--rain);
-}
-
-.nc-bars {
-  position: relative;
-  height: 34px;
-  margin-top: 10px;
-  border-bottom: 1px solid var(--grid);
-  background: linear-gradient(
-    90deg,
-    transparent calc(100% / 3 - 0.5px),
-    var(--grid) 0 calc(100% / 3 + 0.5px),
-    transparent 0 calc(200% / 3 - 0.5px),
-    var(--grid) 0 calc(200% / 3 + 0.5px),
-    transparent 0
-  );
-}
-
-.nc-bar {
-  position: absolute;
-  bottom: 0;
-  border: 0 solid transparent;
-  border-width: 0 1px;
-  border-radius: 4px 4px 1px 1px;
-  background: var(--rain);
-  background-clip: padding-box;
-}
-
-.nc-dry {
-  height: 2px !important;
-  background: rgb(255 255 255 / 0.14);
-  background-clip: padding-box;
-}
-
-.nc-snow {
-  background: var(--snow);
-  background-clip: padding-box;
-}
-
-.nc-sleet {
-  background: linear-gradient(var(--snow), var(--rain));
-  background-clip: padding-box;
-}
-
-.nc-empty {
-  margin: 0;
-  font-size: 12px;
-  color: var(--faint);
-}
-
-.nc-ticks {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 5px;
-  font-size: 11px;
-  color: var(--faint);
-}
-
 /* Next 24 hours */
 
 .hours {
@@ -378,28 +298,47 @@ h2 {
   padding-bottom: 6px;
 }
 
-#point-time {
+#chart-head {
+  flex-wrap: nowrap;
+}
+
+#chart-head.is-wet h2 {
+  color: var(--rain);
+}
+
+#chart-head .muted {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+#chart-head h2 {
+  flex-shrink: 0;
+}
+
+.accent {
   color: var(--accent);
 }
 
-.point-meta {
-  display: flex;
-  gap: 10px;
+.pill {
+  flex: none;
+  margin: -4px -4px -4px auto;
+  padding: 3px 10px;
+  border-radius: 999px;
   font-size: 12px;
-  color: var(--muted);
-  white-space: nowrap;
-}
-
-#point-rain {
-  color: var(--rain);
+  font-weight: 600;
+  color: var(--bg);
+  background: var(--accent);
 }
 
 .chart {
   flex: 1;
-  min-height: 80px;
-  margin: 2px -8px 0;
+  min-height: 120px;
+  margin: 4px -14px 0;
+  overflow: hidden;
   touch-action: none;
-  cursor: crosshair;
+  cursor: grab;
   outline: none;
 }
 
@@ -435,6 +374,51 @@ h2 {
   fill: var(--rain);
 }
 
+.c-uv {
+  fill: var(--sun);
+}
+
+.c-prob {
+  fill: var(--rain);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.c-past {
+  fill: var(--card);
+  opacity: 0.5;
+}
+
+.c-now {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+}
+
+.c-now-label {
+  fill: var(--accent);
+  font-weight: 600;
+}
+
+.c-ev {
+  fill: none;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.c-ev-sun {
+  fill: var(--sun);
+}
+
+.c-ev-moon {
+  fill: var(--moon);
+}
+
+.c-ev-arrow {
+  stroke: var(--muted);
+}
+
 .c-temp {
   fill: none;
   stroke-width: 2.5;
@@ -461,10 +445,6 @@ h2 {
   stroke-width: 2;
 }
 
-.c-marker.is-now line {
-  opacity: 0;
-}
-
 /* 7 days */
 
 .days {
@@ -477,13 +457,22 @@ h2 {
   list-style: none;
 }
 
-#days li {
+#days button {
   display: grid;
   grid-template-columns: 3.5em 1.6em 2.9em 3.6em 2.1em minmax(2em, 1fr) 2.1em;
   align-items: center;
   column-gap: 6px;
+  width: calc(100% + 16px);
   height: var(--row);
+  margin: 0 -8px;
+  padding: 0 8px;
+  border-radius: 8px;
   font-size: 14px;
+  text-align: left;
+}
+
+#days button.is-active {
+  background: rgb(52 211 153 / 0.12);
 }
 
 #days li + li {
@@ -669,7 +658,7 @@ circle.i-sun {
 /* Before the first forecast arrives */
 
 .is-empty .card,
-.is-empty .stats {
+.is-empty .hero-facts {
   opacity: 0.45;
 }
 
@@ -801,19 +790,92 @@ circle.i-sun {
   left: 12px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 6px 14px 6px 6px;
+  gap: 10px;
+  padding: 6px 16px 6px 6px;
   border-radius: 16px;
 }
 
 .radar-bar .map-btn {
+  flex: none;
   border: 0;
   background: none;
 }
 
-.radar-bar input {
+#radar-age.is-forecast {
+  color: var(--sun);
+}
+
+/* Radar timeline: one tick per frame, forecast frames in yellow. */
+
+.rt {
+  position: relative;
   flex: 1;
-  accent-color: var(--accent);
+  padding: 6px 0 16px;
+  touch-action: none;
+  cursor: pointer;
+  outline: none;
+}
+
+.rt-ticks {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 18px;
+}
+
+.rt-ticks i {
+  flex: 1;
+  height: 8px;
+  border-radius: 2px;
+  background: rgb(255 255 255 / 0.25);
+}
+
+.rt-ticks i.is-forecast {
+  background: rgb(251 191 36 / 0.45);
+}
+
+.rt-ticks i.is-now {
+  height: 14px;
+  background: var(--text);
+}
+
+.rt-ticks i.is-active {
+  height: 18px;
+  background: var(--accent);
+}
+
+.rt-labels {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 14px;
+  font-size: 10px;
+  color: var(--faint);
+}
+
+.rt-labels span {
+  position: absolute;
+  top: 0;
+}
+
+.rt-labels span:first-child {
+  left: 0;
+}
+
+.rt-labels .rt-now {
+  transform: translateX(-50%);
+  color: var(--muted);
+}
+
+#radar-end {
+  right: 0;
+  color: var(--sun);
+}
+
+.map-forecast {
+  pointer-events: none;
+  opacity: 0.85;
 }
 
 .map-credits {
@@ -837,16 +899,11 @@ circle.i-sun {
   .hero-temp {
     font-size: clamp(4rem, 21vw, 5.2rem);
   }
-  .stats {
-    margin-top: 8px;
-    padding-top: 8px;
-  }
   .card {
     padding: 10px 12px;
   }
-  .nc-bars {
-    height: 28px;
-    margin-top: 8px;
+  .chart {
+    margin: 4px -12px 0;
   }
 }
 
@@ -859,9 +916,6 @@ circle.i-sun {
   }
   .hero-cond {
     font-size: 16px;
-  }
-  .stats dd {
-    font-size: 13px;
   }
   #days li:nth-child(n + 6) {
     display: none;

@@ -2,12 +2,11 @@
 
 import { PROVIDERS } from '../forecast.js';
 import { describe } from '../weather-codes.js';
-import { rainScale, tempColor } from './colors.js';
+import { tempColor } from './colors.js';
 import { clock, dayDiff, dayOfMonth, decimal, temp, weekday, when } from './format.js';
-import { moonIcon, weatherIcon } from './icons.js';
+import { weatherIcon } from './icons.js';
 
 const $ = (id) => document.getElementById(id);
-const MINUTE = 60_000;
 
 const NOUN = { rain: 'Regen', snow: 'Schneefall', sleet: 'Schneeregen' };
 
@@ -65,67 +64,66 @@ function glow(code, isDay) {
 }
 
 export function renderHero(view) {
-  const { current, days, astro, timezone: tz } = view;
+  const { current, days } = view;
   const { label, icon } = describe(current.code, current.isDay);
   $('temp').textContent = temp(current.temp);
   $('cond-icon').innerHTML = weatherIcon(icon, current.isDay);
   $('cond').textContent = label;
-  $('feels').textContent = current.feelsLike == null ? '' : `Gefühlt ${temp(current.feelsLike)}`;
+  $('feels').textContent = current.feelsLike == null ? '–' : temp(current.feelsLike);
   $('hi').textContent = temp(days[0]?.tempMax);
   $('lo').textContent = temp(days[0]?.tempMin);
 
   const wind = Math.round(current.wind ?? 0);
   const gust = Math.round(current.gust ?? 0);
-  $('wind').textContent = `${wind} km/h`;
-  $('wind-label').textContent = gust >= 30 && gust > wind + 10 ? `Böen ${gust}` : 'Wind';
+  $('wind').textContent = gust >= 30 && gust > wind + 10 ? `${wind}–${gust} km/h` : `${wind} km/h`;
   $('uv').textContent = Math.round(current.uv ?? 0);
-  if (astro) {
-    $('sun').textContent = `${clock(astro.sunrise, tz)}–${clock(astro.sunset, tz)}`;
-    $('moon').textContent = `${clock(astro.moonrise, tz)}–${clock(astro.moonset, tz)}`;
-    $('moon-icon').innerHTML = moonIcon(astro.moonPhase ?? 0.5);
-  }
   document.documentElement.style.setProperty('--glow', glow(current.code, current.isDay));
 }
 
-export function renderNowcast(view) {
-  const { nowcast, outlook, now, timezone: tz } = view;
-  const text = outlookText(outlook, now, tz);
-  $('outlook').textContent = text.title;
-  $('outlook-detail').textContent = text.detail;
-  $('nowcast').classList.toggle('is-wet', text.wet);
+function dayName(start, now, tz, style = 'long') {
+  const diff = dayDiff(start, now, tz);
+  if (diff === 0) return 'Heute';
+  if (diff === 1) return 'Morgen';
+  return weekday(start, tz, style);
+}
 
-  const bars = $('nowcast-bars');
-  if (!nowcast) {
-    bars.innerHTML = '<p class="nc-empty">Keine aktuellen Kurzfristdaten</p>';
+// The chart card's header: the precipitation outlook by default, the values
+// of a tapped point, or a summary of the day the chart jumped to.
+export function renderChartHead(view, { point, day }) {
+  const { now, timezone: tz } = view;
+  const title = $('chart-title');
+  const detail = $('chart-detail');
+  const head = $('chart-head');
+  head.classList.remove('is-wet', 'is-point');
+
+  if (point) {
+    const sameDay = dayDiff(point.time, now, tz) === 0;
+    const time = point.now
+      ? 'Jetzt'
+      : `${sameDay ? '' : `${weekday(point.time, tz)} `}${clock(point.time, tz)}`;
+    title.innerHTML = `<span class="accent">${time}</span> ${temp(point.temp)}`;
+    detail.textContent = point.fine
+      ? `${decimal(point.rate ?? 0)} mm/h · ${Math.round(point.wind ?? 0)} km/h`
+      : `${point.prob ?? 0} % · ${decimal(point.precip ?? 0)} mm · ${Math.round(point.wind ?? 0)} km/h`;
+    head.classList.add('is-point');
     return;
   }
-  const span = nowcast.until - nowcast.from;
-  bars.innerHTML = nowcast.steps
-    .map((s) => {
-      const left = ((s.start - nowcast.from) / span) * 100;
-      const width = ((Math.min(s.end, nowcast.until) - s.start) / span) * 100;
-      const height = rainScale(s.rate) * 100;
-      const cls = s.type ? `nc-bar nc-${s.type}` : 'nc-bar nc-dry';
-      return `<i class="${cls}" style="left:${left.toFixed(2)}%;width:${width.toFixed(2)}%;height:${height.toFixed(1)}%"></i>`;
-    })
-    .join('');
-  const ticks = [0, 30, 60, 90].map((m, i) => (i === 0 ? 'jetzt' : clock(now + m * MINUTE, tz)));
-  $('nowcast-ticks').innerHTML = ticks.map((t) => `<span>${t}</span>`).join('');
+
+  const d = day != null && view.days.find((x) => x.time === day);
+  if (d) {
+    title.textContent = dayName(d.time, now, tz);
+    const rain = (d.precipProb ?? 0) >= 20 && d.precipSum >= 0.1;
+    detail.textContent = `${temp(d.tempMin)} / ${temp(d.tempMax)}${rain ? ` · ${d.precipProb} % · ${decimal(d.precipSum)} mm` : ' · trocken'}`;
+    return;
+  }
+
+  const text = outlookText(view.outlook, now, tz);
+  title.textContent = text.title;
+  detail.textContent = text.detail;
+  head.classList.toggle('is-wet', text.wet);
 }
 
-export function renderPoint(point, view) {
-  if (!point) return;
-  const tz = view.timezone;
-  $('point-time').textContent = point.now ? 'Jetzt' : clock(point.time, tz);
-  $('point-temp').textContent = temp(point.temp);
-  const rain = point.fine
-    ? `${decimal(point.rate ?? 0)} mm/h`
-    : `${point.prob ?? 0} % · ${decimal(point.precip ?? 0)} mm`;
-  $('point-rain').textContent = rain;
-  $('point-wind').textContent = `${Math.round(point.wind ?? 0)} km/h`;
-}
-
-export function renderDays(view) {
+export function renderDays(view, activeDay) {
   const { days, current, timezone: tz } = view;
   if (!days.length) return;
   const lo = Math.min(...days.map((d) => d.tempMin));
@@ -140,7 +138,7 @@ export function renderDays(view) {
       const rainy = prob >= 20 && d.precipSum >= 0.1;
       const dot =
         i === 0 && current.temp != null ? `<b style="left:${pos(current.temp).toFixed(1)}%"></b>` : '';
-      return `<li>
+      return `<li><button type="button" data-day="${d.time}"${d.time === activeDay ? ' class="is-active"' : ''} aria-label="${dayName(d.time, view.now, tz)} im Diagramm zeigen">
 <span class="d-name">${name}${i === 0 ? '' : `<small>${dayOfMonth(d.time, tz)}.</small>`}</span>
 <span class="d-icon">${weatherIcon(icon, true, label)}</span>
 <span class="d-rain">${rainy ? `${prob} %` : ''}</span>
@@ -148,7 +146,7 @@ export function renderDays(view) {
 <span class="d-lo">${temp(d.tempMin)}</span>
 <span class="d-bar"><i style="left:${pos(d.tempMin).toFixed(1)}%;right:${(100 - pos(d.tempMax)).toFixed(1)}%;background:linear-gradient(90deg,${tempColor(d.tempMin)},${tempColor(d.tempMax)})"></i>${dot}</span>
 <span class="d-hi">${temp(d.tempMax)}</span>
-</li>`;
+</button></li>`;
     })
     .join('');
 }

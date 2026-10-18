@@ -28,7 +28,6 @@
 <link rel="modulepreload" href="js/sources/http.js">
 <link rel="modulepreload" href="js/sources/open-meteo.js">
 <link rel="modulepreload" href="js/sources/geosphere.js">
-<link rel="modulepreload" href="js/sources/bright-sky.js">
 <link rel="modulepreload" href="js/sources/nominatim.js">
 <link rel="modulepreload" href="js/ui/chart.js">
 <link rel="modulepreload" href="js/ui/colors.js">
@@ -55,33 +54,23 @@
         <div id="temp" class="hero-temp">–</div>
         <div class="hero-side">
           <div class="hero-cond"><span id="cond-icon"></span><span id="cond">Wetter wird geladen</span></div>
-          <div id="feels" class="hero-feels"></div>
-          <div class="hero-range"><span>H <b id="hi">–</b></span><span>T <b id="lo">–</b></span></div>
+          <dl class="hero-facts">
+            <div><dt>Gefühlt</dt><dd id="feels">–</dd></div>
+            <div><dt>Wind</dt><dd id="wind">–</dd></div>
+            <div><dt>H / T</dt><dd><span id="hi">–</span> / <span id="lo">–</span></dd></div>
+            <div><dt>UV</dt><dd id="uv">–</dd></div>
+          </dl>
         </div>
       </div>
-      <dl class="stats">
-        <div><dt id="wind-label">Wind</dt><dd id="wind">–</dd></div>
-        <div><dt>UV</dt><dd id="uv">–</dd></div>
-        <div><dt>Sonne</dt><dd id="sun">–</dd></div>
-        <div><dt><span id="moon-icon"></span>Mond</dt><dd id="moon">–</dd></div>
-      </dl>
     </header>
 
-    <section id="nowcast" class="card nowcast" aria-label="Niederschlag">
-      <div class="card-head">
-        <h2 id="outlook">&nbsp;</h2>
-        <span id="outlook-detail" class="muted"></span>
+    <section class="card hours" aria-label="Vorhersage">
+      <div id="chart-head" class="card-head">
+        <h2 id="chart-title">&nbsp;</h2>
+        <span id="chart-detail" class="muted"></span>
+        <button id="chart-now" class="pill" type="button" hidden>Jetzt</button>
       </div>
-      <div id="nowcast-bars" class="nc-bars"></div>
-      <div id="nowcast-ticks" class="nc-ticks"></div>
-    </section>
-
-    <section class="card hours" aria-label="Nächste 24 Stunden">
-      <div class="card-head point">
-        <h2><span id="point-time">Jetzt</span> <span id="point-temp"></span></h2>
-        <span class="point-meta"><span id="point-rain"></span><span id="point-wind"></span></span>
-      </div>
-      <div id="chart" class="chart" tabindex="0" aria-label="Temperatur und Niederschlag, 24 Stunden"></div>
+      <div id="chart" class="chart" tabindex="0" aria-label="Temperatur, Regen und UV-Index der ganzen Woche, seitlich verschiebbar"></div>
     </section>
 
     <section class="card days" aria-label="7 Tage">

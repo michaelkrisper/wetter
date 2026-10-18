@@ -1,0 +1,2 @@
+jsfive 0.4.2 (https://github.com/usnistgov/jsfive), dist/esm/index.mjs, unmodified (renamed to .js for MIME types).
+Pure-JS HDF5 reader used by the radar tab to decode the GeoSphere INCA NetCDF grid.
