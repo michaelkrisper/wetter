@@ -63,4 +63,4 @@ jobs:
             echo "/$f -> $code"
             [ "$code" = 200 ] || { echo "::error::/$f returned $code"; exit 1; }
           done
-          curl -s "${live}sw.js" | grep -q "wetter-${GITHUB_SHA::8}" || { echo "::error::sw.js not stamped"; exit 1; }
+          curl -s "${live}sw.js" | grep -q "'${GITHUB_SHA::8}'" || { echo "::error::sw.js is not stamped with this commit"; exit 1; }
