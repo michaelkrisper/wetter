@@ -1,0 +1,28 @@
+{
+  "name": "wetter",
+  "version": "1.0.0",
+  "description": "Minimalist weather PWA: minute-precise nowcast for the next 90 minutes, then hourly and daily, seamlessly merged from national weather services.",
+  "homepage": "https://michaelkrisper.github.io/wetter/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/michaelkrisper/wetter.git"
+  },
+  "bugs": "https://github.com/michaelkrisper/wetter/issues",
+  "author": "Michael Krisper",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "serve": "node scripts/serve.mjs",
+    "lint": "biome check",
+    "lint:fix": "biome check --write",
+    "borders": "node scripts/build-borders.mjs",
+    "check": "npm run lint"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.15"
+  }
+}

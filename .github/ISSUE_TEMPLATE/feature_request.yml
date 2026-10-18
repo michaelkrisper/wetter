@@ -1,0 +1,11 @@
+name: Feature request
+description: An idea that keeps the app minimal
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Idea
+      description: What would you like to see, and why does it belong on a one-glance screen?
+    validations:
+      required: true
