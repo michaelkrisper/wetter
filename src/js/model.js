@@ -81,7 +81,7 @@ function outlook(steps, hours, spells, days, until) {
   if (next) {
     return {
       kind: 'starts',
-      at: Math.max(next.start, until),
+      at: Math.max(next.time, until),
       type: next.type,
       peak: next.peak,
       prob: next.prob,
@@ -123,25 +123,27 @@ function currentView(forecast, now, steps, today) {
 const blend = (bias, distance) => bias * Math.exp(-distance / (BLEND_HOURS * HOUR));
 
 // Precipitation intervals: the nowcast where it exists, hourly model values
-// around it. The hour that overlaps the nowcast window is cut, not doubled.
+// around it. An hourly value is drawn centred on its hour line, as it is read;
+// where it overlaps the nowcast window it is cut, not doubled.
 function precipitationBars(hourly, from, steps) {
   const bars = (steps ?? []).map((s) => ({ start: s.start, end: s.end, rate: s.rate, prob: null }));
   const [cutFrom, cutTo] = steps ? [steps[0].start, steps.at(-1).end] : [0, 0];
   for (const h of hourly) {
-    const start = h.time - HOUR;
-    if (h.time <= from || h.precip == null) continue;
-    const bar = { rate: h.precip, prob: h.prob, type: precipitationType(h.code, h.temp) };
-    if (h.time <= cutFrom || start >= cutTo) bars.push({ ...bar, start, end: h.time });
+    const start = h.time - HOUR / 2;
+    const end = h.time + HOUR / 2;
+    if (end <= from || h.precip == null) continue;
+    const bar = { time: h.time, rate: h.precip, prob: h.prob, type: precipitationType(h.code, h.temp) };
+    if (end <= cutFrom || start >= cutTo) bars.push({ ...bar, start, end });
     else {
       if (start < cutFrom) bars.push({ ...bar, start, end: cutFrom });
-      if (h.time > cutTo) bars.push({ ...bar, start: cutTo, end: h.time });
+      if (end > cutTo) bars.push({ ...bar, start: cutTo, end });
     }
   }
   return bars.sort((a, b) => a.start - b.start);
 }
 
-// Model rain spells: runs of hours that may well bring rain, each with its
-// most likely hour. The nowcast (no probability) interrupts them.
+// Model rain spells: runs of hours that may well bring rain, with the highest
+// probability and the wettest hour. The nowcast (no probability) interrupts them.
 function rainSpells(bars) {
   const spells = [];
   let spell = null;
@@ -151,13 +153,13 @@ function rainSpells(bars) {
       continue;
     }
     if (!spell) {
-      spell = { start: bar.start, type: bar.type, prob: 0, peak: 0, total: 0 };
+      spell = { start: bar.start, time: bar.time, type: bar.type, prob: 0, peak: 0, total: 0 };
       spells.push(spell);
     }
     spell.end = bar.end;
-    spell.peak = Math.max(spell.peak, bar.rate);
     spell.total += (bar.rate * (bar.end - bar.start)) / HOUR;
-    if (bar.prob > spell.prob) Object.assign(spell, { prob: bar.prob, top: bar });
+    spell.prob = Math.max(spell.prob, bar.prob);
+    if (bar.rate > spell.peak) Object.assign(spell, { peak: bar.rate, wettest: bar });
   }
   return spells;
 }

@@ -219,15 +219,17 @@ h2 {
 
 .hero-cond {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 17px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  font-size: 22px;
   font-weight: 500;
+  line-height: 1.15;
 }
 
 .hero-cond .wx {
   flex: none;
-  font-size: 30px;
+  font-size: 52px;
 }
 
 /* Cards */
@@ -893,7 +895,10 @@ circle.i-sun {
     font-size: 3.8rem;
   }
   .hero-cond {
-    font-size: 16px;
+    font-size: 19px;
+  }
+  .hero-cond .wx {
+    font-size: 42px;
   }
   #days li:nth-child(n + 6) {
     display: none;

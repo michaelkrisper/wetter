@@ -14,6 +14,9 @@ const LEAD = HOUR; // the default view starts one hour before now
 const PAD = { top: 18, bottom: 36 };
 // Hour labels every hour where they fit, every 3 hours otherwise.
 const HOURLY_LABEL_PX = 24;
+// The temperature axis fits what is on screen, but spans at least this many
+// degrees, so a calm night stays calm.
+const MIN_SPAN = 4;
 const DESELECT_MS = 8000;
 const TAP_SLOP = 6;
 const f1 = (n) => n.toFixed(1);
@@ -87,13 +90,12 @@ function barsSvg({ bars, uv }, { x, plotBottom, barMax }) {
   return uvSvg + rainSvg;
 }
 
-// One probability label per rain spell (see model.js), on its most likely
-// hour, above the spell's highest bar.
+// One probability label per rain spell (see model.js), above its highest bar.
 function probabilityLabels(spells, { x, plotBottom, barMax }) {
   return spells
     .map(
-      ({ top, prob, peak }) =>
-        `<text class="c-prob" x="${f1((x(top.start) + x(top.end)) / 2)}" y="${f1(plotBottom - barHeight(peak, barMax) - 4)}" text-anchor="middle">${prob} %</text>`,
+      ({ wettest, prob, peak }) =>
+        `<text class="c-prob" x="${f1((x(wettest.start) + x(wettest.end)) / 2)}" y="${f1(plotBottom - barHeight(peak, barMax) - 4)}" text-anchor="middle">${prob} %</text>`,
     )
     .join('');
 }
@@ -148,8 +150,9 @@ function extremesSvg(points, xy, days) {
     const iMax = inDay.reduce((a, b) => (points[b].temp > points[a].temp ? b : a));
     const iMin = inDay.reduce((a, b) => (points[b].temp < points[a].temp ? b : a));
     if (points[iMax].temp - points[iMin].temp < 1) continue;
-    svg += `<text class="c-extreme" x="${f1(xy[iMax][0])}" y="${f1(xy[iMax][1] - 7)}" text-anchor="middle">${temp(points[iMax].temp)}</text>`;
-    svg += `<text class="c-extreme" x="${f1(xy[iMin][0])}" y="${f1(xy[iMin][1] + 15)}" text-anchor="middle">${temp(points[iMin].temp)}</text>`;
+    // Placed by applyY() as the temperature axis follows the view.
+    svg += `<text class="c-extreme" x="${f1(xy[iMax][0])}" data-y="${f1(xy[iMax][1])}" data-dy="-7" text-anchor="middle">${temp(points[iMax].temp)}</text>`;
+    svg += `<text class="c-extreme" x="${f1(xy[iMin][0])}" data-y="${f1(xy[iMin][1])}" data-dy="15" text-anchor="middle">${temp(points[iMin].temp)}</text>`;
   }
   return svg;
 }
@@ -166,6 +169,10 @@ export function createChart(el, { onSelect, onView }) {
   let selected = null;
   let deselectTimer = 0;
   let animation = 0;
+  // The curve is drawn once for the whole week's range; the vertical fit to
+  // the visible part is an affine map y' = a * y + b applied on top.
+  let fit = { a: 1, b: 0 };
+  let fitAnimation = 0;
 
   const x = (t) => (t - view.timeline.from) * scale;
   const maxStart = () => Math.max(view.timeline.from, view.timeline.until - span);
@@ -179,6 +186,60 @@ export function createChart(el, { onSelect, onView }) {
   function setStart(t) {
     viewStart = clampStart(t);
     applyScroll();
+    refit();
+  }
+
+  function targetFit() {
+    const { points, lo, hi, tempBottom, tempH } = geometry;
+    const from = viewStart - HOUR;
+    const to = viewStart + span + HOUR;
+    let vlo = Infinity;
+    let vhi = -Infinity;
+    for (const p of points) {
+      if (p.time < from || p.time > to) continue;
+      vlo = Math.min(vlo, p.temp);
+      vhi = Math.max(vhi, p.temp);
+    }
+    if (!Number.isFinite(vlo)) return { a: 1, b: 0 };
+    const minSpan = Math.min(MIN_SPAN, hi - lo);
+    if (vhi - vlo < minSpan) {
+      const mid = Math.min(hi - minSpan / 2, Math.max(lo + minSpan / 2, (vhi + vlo) / 2));
+      vlo = mid - minSpan / 2;
+      vhi = mid + minSpan / 2;
+    }
+    const a = (hi - lo) / (vhi - vlo);
+    return { a, b: tempBottom * (1 - a) - ((lo - vlo) * tempH) / (vhi - vlo) };
+  }
+
+  function applyFit() {
+    const { a, b } = fit;
+    el.querySelector('.c-curve')?.setAttribute(
+      'transform',
+      `matrix(1 0 0 ${a.toFixed(4)} 0 ${b.toFixed(2)})`,
+    );
+    for (const label of el.querySelectorAll('.c-extreme')) {
+      label.setAttribute('y', f1(a * Number(label.dataset.y) + b + Number(label.dataset.dy)));
+    }
+    placeMarker();
+  }
+
+  // Eases towards the fit for the current view; `now` jumps there.
+  function refit(now = false) {
+    if (!geometry) return;
+    const target = targetFit();
+    cancelAnimationFrame(fitAnimation);
+    if (now) {
+      fit = target;
+      applyFit();
+      return;
+    }
+    const step = () => {
+      fit = { a: fit.a + (target.a - fit.a) * 0.25, b: fit.b + (target.b - fit.b) * 0.25 };
+      if (Math.abs(target.a - fit.a) < 0.002 && Math.abs(target.b - fit.b) < 0.2) fit = target;
+      applyFit();
+      if (fit !== target) fitAnimation = requestAnimationFrame(step);
+    };
+    fitAnimation = requestAnimationFrame(step);
   }
 
   function notifyView() {
@@ -205,9 +266,10 @@ export function createChart(el, { onSelect, onView }) {
       lo = mid - 2;
       hi = mid + 2;
     }
-    const y = (v) => tempBottom - ((v - lo) / (hi - lo)) * (tempBottom - tempTop);
+    const tempH = tempBottom - tempTop;
+    const y = (v) => tempBottom - ((v - lo) / (hi - lo)) * tempH;
     const xy = points.map((p) => [x(p.time), y(p.temp)]);
-    geometry = { xy };
+    geometry = { xy, points, lo, hi, tempBottom, tempH };
 
     const line = monotonePath(xy);
     const area = `${line}L${f1(xy.at(-1)[0])} ${plotBottom}L${f1(xy[0][0])} ${plotBottom}Z`;
@@ -228,11 +290,14 @@ export function createChart(el, { onSelect, onView }) {
 <defs>
 <linearGradient id="c-line" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="${f1(tempTop)}" y2="${f1(tempBottom)}">${stops}</linearGradient>
 <linearGradient id="c-area" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${tempColor(hi)}" stop-opacity=".2"/><stop offset="1" stop-color="${tempColor(lo)}" stop-opacity="0"/></linearGradient>
+<clipPath id="c-clip"><rect x="0" y="0" width="${f1(x(until))}" height="${plotBottom}"/></clipPath>
 </defs>
 <g class="c-scroll">
 ${shade}${midnights}${barsSvg(timeline, layout)}
+<g clip-path="url(#c-clip)"><g class="c-curve">
 <path d="${area}" fill="url(#c-area)"/>
-<path class="c-temp" d="${line}" stroke="url(#c-line)"/>
+<path class="c-temp" d="${line}" stroke="url(#c-line)" vector-effect="non-scaling-stroke"/>
+</g></g>
 <rect class="c-past" x="0" y="0" width="${f1(nowX)}" height="${h}"/>
 ${uvLabels(timeline.uv, days, layout)}${probabilityLabels(spells, layout)}${extremesSvg(points, xy, days)}${labels}
 <line class="c-now" x1="${f1(nowX)}" x2="${f1(nowX)}" y1="${plotTop - 2}" y2="${plotBottom}"/>
@@ -242,7 +307,7 @@ ${uvLabels(timeline.uv, days, layout)}${probabilityLabels(spells, layout)}${extr
 </svg>`;
     if (follow) viewStart = now - LEAD;
     setStart(viewStart);
-    placeMarker();
+    refit(true);
   }
 
   function placeMarker() {
@@ -252,7 +317,7 @@ ${uvLabels(timeline.uv, days, layout)}${probabilityLabels(spells, layout)}${extr
     if (selected == null) return;
     const [px, py] = geometry.xy[selected];
     marker.setAttribute('transform', `translate(${f1(px)} 0)`);
-    marker.querySelector('circle').setAttribute('cy', f1(py));
+    marker.querySelector('circle').setAttribute('cy', f1(fit.a * py + fit.b));
   }
 
   function select(index) {
