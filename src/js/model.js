@@ -15,6 +15,8 @@ const HOUR = 60 * MINUTE;
 const BLEND_HOURS = 3;
 // Thresholds for "it will rain" beyond the nowcast, where only probabilities exist.
 const HOURLY_WET = { prob: 50, mm: 0.1 };
+// Hours that belong to a rain spell in the chart.
+const SPELL = { prob: 30, mm: 0.05 };
 const DAILY_WET = { prob: 50, mm: 1 };
 
 export function interpolate(series, time, key) {
@@ -62,7 +64,7 @@ function nowcastSteps(forecast, now, until) {
 
 // One sentence about precipitation, reading the timeline from the most precise
 // source onwards: nowcast first, then hours, then days.
-function outlook(steps, hours, days, until) {
+function outlook(steps, hours, spells, days, until) {
   const upcoming = hours.filter((h) => h.time > until);
   if (steps?.some(isWet)) {
     const wet = steps.filter(isWet);
@@ -74,14 +76,16 @@ function outlook(steps, hours, days, until) {
     const end = upcoming.find((h) => !hourIsWet(h));
     return { ...base, kind: end ? 'stops' : 'continues', at: end && end.time - HOUR, exact: false };
   }
-  const next = upcoming.find(hourIsWet);
+  // A whole spell, not its first hour: the chart labels it with the same probability.
+  const next = spells.find((s) => s.end > until && s.prob >= HOURLY_WET.prob && s.total >= HOURLY_WET.mm);
   if (next) {
     return {
       kind: 'starts',
-      at: next.time - HOUR,
-      type: precipitationType(next.code, next.temp),
-      peak: next.precip,
+      at: Math.max(next.start, until),
+      type: next.type,
+      peak: next.peak,
       prob: next.prob,
+      total: next.total,
       exact: false,
     };
   }
@@ -111,11 +115,8 @@ function currentView(forecast, now, steps, today) {
     current.temp;
   return {
     temp,
-    feelsLike: current.feelsLike == null || temp == null ? null : temp + (current.feelsLike - current.temp),
     code: observedCode(base.code, steps?.[0], nowcast.provider),
     isDay: today?.sunrise ? now >= today.sunrise && now < today.sunset : base.isDay,
-    wind: interpolate(nowcast.steps, now, 'wind') ?? base.wind,
-    gust: interpolate(nowcast.steps, now, 'gust') ?? base.gust ?? null,
     uv: interpolate(hourly, now, 'uv') ?? 0,
   };
 }
@@ -130,7 +131,7 @@ function precipitationBars(hourly, from, steps) {
   for (const h of hourly) {
     const start = h.time - HOUR;
     if (h.time <= from || h.precip == null) continue;
-    const bar = { rate: h.precip, prob: h.prob };
+    const bar = { rate: h.precip, prob: h.prob, type: precipitationType(h.code, h.temp) };
     if (h.time <= cutFrom || start >= cutTo) bars.push({ ...bar, start, end: h.time });
     else {
       if (start < cutFrom) bars.push({ ...bar, start, end: cutFrom });
@@ -138,6 +139,28 @@ function precipitationBars(hourly, from, steps) {
     }
   }
   return bars.sort((a, b) => a.start - b.start);
+}
+
+// Model rain spells: runs of hours that may well bring rain, each with its
+// most likely hour. The nowcast (no probability) interrupts them.
+function rainSpells(bars) {
+  const spells = [];
+  let spell = null;
+  for (const bar of bars) {
+    if (bar.prob == null || bar.prob < SPELL.prob || bar.rate < SPELL.mm) {
+      spell = null;
+      continue;
+    }
+    if (!spell) {
+      spell = { start: bar.start, type: bar.type, prob: 0, peak: 0, total: 0 };
+      spells.push(spell);
+    }
+    spell.end = bar.end;
+    spell.peak = Math.max(spell.peak, bar.rate);
+    spell.total += (bar.rate * (bar.end - bar.start)) / HOUR;
+    if (bar.prob > spell.prob) Object.assign(spell, { prob: bar.prob, top: bar });
+  }
+  return spells;
 }
 
 // Temperature from today 00:00 to the last hour: nowcast resolution around
@@ -183,7 +206,8 @@ function timeline(forecast, now, until, current, steps, from) {
     .filter((h) => h.time >= from && h.time <= end && h.uv >= 0.5)
     .map((h) => ({ start: h.time - HOUR / 2, end: h.time + HOUR / 2, uv: h.uv }));
 
-  return { from, until: end, now, points, bars: precipitationBars(hourly, from, steps), uv, events };
+  const bars = precipitationBars(hourly, from, steps);
+  return { from, until: end, now, points, bars, spells: rainSpells(bars), uv, events };
 }
 
 export function snapshot(forecast, now = Date.now()) {
@@ -203,15 +227,15 @@ export function snapshot(forecast, now = Date.now()) {
 
   const hours = forecast.hourly.filter((h) => h.time > now);
   const from = today?.time ?? forecast.hourly[0].time;
+  const line = timeline(forecast, now, until, current, steps, from);
 
   return {
     now,
     timezone: forecast.timezone,
-    providers: forecast.providers,
     fetchedAt: forecast.fetchedAt,
     current,
-    outlook: outlook(steps, hours, days, until),
-    timeline: timeline(forecast, now, until, current, steps, from),
+    outlook: outlook(steps, hours, line.spells, days, until),
+    timeline: line,
     days,
     daylight: forecast.daily.map((d) => [d.sunrise, d.sunset]).filter(([a, b]) => a && b),
   };

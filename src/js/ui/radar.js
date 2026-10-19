@@ -128,6 +128,7 @@ export function createRadar(root) {
   let pastAt = 0;
   let forecastAt = 0;
   let forecastKey = '';
+  let forecastLoading = null;
   let timer = 0;
   let playing = false;
   let visible = false;
@@ -164,6 +165,11 @@ export function createRadar(root) {
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(f.canvas, 0, 0);
+    // Outside this area there is no forecast; outline it so empty is not mistaken for dry.
+    ctx.strokeStyle = 'rgb(255 255 255 / 0.25)';
+    ctx.lineWidth = 1 / Math.hypot(a, b);
+    ctx.setLineDash([4 / Math.hypot(a, b), 4 / Math.hypot(a, b)]);
+    ctx.strokeRect(0, 0, nx, ny);
   }
 
   function layout() {
@@ -235,7 +241,8 @@ export function createRadar(root) {
     const minutes = Math.round((f.time - Date.now()) / 60_000);
     const age = $('#radar-age');
     age.classList.toggle('is-forecast', Boolean(f.canvas));
-    if (f.canvas) age.textContent = `Vorhersage · in ${minutes} min`;
+    const ahead = minutes > 0 ? `in ${minutes} min` : 'jetzt';
+    if (f.canvas) age.textContent = `Vorhersage · ${ahead}${f.dry ? ' · trocken' : ''}`;
     else age.textContent = minutes >= -5 ? 'aktuell' : `vor ${-minutes} min`;
   }
 
@@ -280,22 +287,33 @@ export function createRadar(root) {
     }
   }
 
-  async function loadForecast() {
+  function loadForecast() {
     const key = `${place.lat.toFixed(1)},${place.lon.toFixed(1)}`;
-    if (key === forecastKey && Date.now() - forecastAt < FORECAST_TTL) return;
+    if (forecastLoading?.key === key) return forecastLoading;
+    if (key === forecastKey && Date.now() - forecastAt < FORECAST_TTL) return Promise.resolve();
     if (!forecast) $('#radar-end').textContent = 'lädt …';
-    try {
-      const grid = await fetchRadarForecast(place.lat, place.lon);
-      forecast = {
-        grid,
-        frames: grid.frames.map((f) => ({ time: f.time, canvas: frameCanvas(grid, f.rates) })),
-      };
-      forecastAt = Date.now();
-      forecastKey = key;
+    const loading = (async () => {
+      try {
+        const grid = await fetchRadarForecast(place.lat, place.lon);
+        forecast = {
+          grid,
+          frames: grid.frames.map((f) => ({
+            time: f.time,
+            canvas: frameCanvas(grid, f.rates),
+            dry: !f.rates.some((rate) => rate >= RAMP[0][0]),
+          })),
+        };
+        forecastAt = Date.now();
+        forecastKey = key;
+      } catch (error) {
+        console.warn('Radar forecast:', error);
+      }
+      if (forecastLoading === loading) forecastLoading = null;
       rebuildFrames();
-    } catch (error) {
-      console.warn('Radar forecast:', error);
-    }
+    })();
+    loading.key = key;
+    forecastLoading = loading;
+    return loading;
   }
 
   // Gestures: the layers follow the fingers through a CSS transform
@@ -455,6 +473,12 @@ export function createRadar(root) {
       loadForecast();
       await loadPast();
       play(true);
+    },
+    // Back in the foreground or after a while: replace what has become old.
+    refresh() {
+      if (!visible) return;
+      loadForecast();
+      loadPast();
     },
     hide() {
       visible = false;

@@ -22,9 +22,9 @@ together from several weather services into one continuous forecast.
   zooming, no settings.
 - **One chart for the whole week.** Temperature curve over precipitation bars
   (height = amount, opacity = probability) and UV bars, with sunrise/sunset
-  and moonrise/moonset marked at their time. 24 hours wide; drag sideways to
-  scroll, tap a point for its values, tap a day in the list to jump to its
-  00-24 h.
+  and moonrise/moonset marked at their time. 12 hours wide with hourly
+  labels; drag sideways to scroll, tap a point for its values, tap a day in
+  the list to see its 00-24 h.
 - **Precision where it matters.** The closer the time, the finer the data:
   1 km / 15-minute nowcast for the next 90 minutes, a 2.5 km national model
   for the next days, global models for the rest of the week.
@@ -114,7 +114,7 @@ src/
 ```
 
 `model.js` is deliberately free of I/O and DOM: a cached forecast can be
-re-evaluated every minute as time passes, and the merging logic is easy to
+re-evaluated at any time as time passes, and the merging logic is easy to
 test.
 
 ### Adding a region

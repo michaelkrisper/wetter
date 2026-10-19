@@ -11,10 +11,9 @@ export const MOVE_THRESHOLD_KM = 1.5;
 export const NOWCAST_MINUTES = 90;
 export const DAYS = 7;
 
-// Refresh while visible, and when the app comes back to the foreground with
-// data older than STALE_MS. INCA updates every 15 minutes.
-export const REFRESH_MS = 5 * 60_000;
-export const STALE_MS = 2 * 60_000;
+// Refresh while visible and when the app comes back to the foreground, once
+// the data is older than this. INCA updates every 15 minutes.
+export const REFRESH_MS = 10 * 60_000;
 export const REQUEST_TIMEOUT_MS = 8000;
 
 // Precipitation rate (mm/h) below which a nowcast step counts as dry.

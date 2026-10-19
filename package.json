@@ -1,6 +1,6 @@
 {
   "name": "wetter",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Minimalist weather PWA: minute-precise nowcast for the next 90 minutes, then hourly and daily, seamlessly blended from GeoSphere Austria and Open-Meteo.",
   "homepage": "https://michaelkrisper.github.io/wetter/",
   "repository": {

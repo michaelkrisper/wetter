@@ -3,6 +3,28 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.0] - 2026-10-19
+
+### Changed
+
+- Chart shows 12 hours per screen with a label every hour; a tapped day still
+  shows its whole 24 hours. Sun and moon events moved to the bottom.
+- Rain bars: height is the amount, opacity the probability; hours without an
+  expected amount get no bar.
+- The outlook quotes the probability of the whole rain spell, the same number
+  the chart shows; a day's precipitation sum comes from the same hours as the
+  chart.
+- "Feels like" and wind removed from the header.
+- Data refreshes every 10 minutes (was 5) and no longer re-renders every minute.
+- 20 px more space at the top, clear of the iOS status bar blur.
+
+### Fixed
+
+- Radar pinch zoom now zooms where the fingers are.
+- Radar reloads old frames when the app returns to the foreground; a failed
+  forecast no longer shows "lädt …" forever; dry forecast frames say so, and
+  the forecast area is outlined.
+
 ## [1.1.0] - 2026-10-18
 
 ### Added

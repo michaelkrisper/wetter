@@ -1,6 +1,5 @@
 // Renders a snapshot (see model.js) into the static skeleton of index.html.
 
-import { PROVIDERS } from '../forecast.js';
 import { describe } from '../weather-codes.js';
 import { tempColor } from './colors.js';
 import { clock, dayDiff, dayOfMonth, decimal, temp, weekday, when } from './format.js';
@@ -25,7 +24,7 @@ function outlookText(outlook, now, tz) {
         title: `${precipitationLabel(outlook.type, outlook.peak)} ab ${outlook.exact ? '' : 'ca. '}${at(outlook.at)}`,
         detail: outlook.exact
           ? `≈ ${decimal(outlook.total)} mm in 90 min`
-          : `${outlook.prob ?? '–'} % Wahrscheinlichkeit`,
+          : `${outlook.prob} % · ${decimal(outlook.total, outlook.total < 10 ? 1 : 0)} mm`,
         wet: outlook.exact,
       };
     case 'stops':
@@ -69,13 +68,9 @@ export function renderHero(view) {
   $('temp').textContent = temp(current.temp);
   $('cond-icon').innerHTML = weatherIcon(icon, current.isDay);
   $('cond').textContent = label;
-  $('feels').textContent = current.feelsLike == null ? '–' : temp(current.feelsLike);
   $('hi').textContent = temp(days[0]?.tempMax);
   $('lo').textContent = temp(days[0]?.tempMin);
 
-  const wind = Math.round(current.wind ?? 0);
-  const gust = Math.round(current.gust ?? 0);
-  $('wind').textContent = gust >= 30 && gust > wind + 10 ? `${wind}–${gust} km/h` : `${wind} km/h`;
   $('uv').textContent = Math.round(current.uv ?? 0);
   document.documentElement.style.setProperty('--glow', glow(current.code, current.isDay));
 }
@@ -149,12 +144,4 @@ export function renderDays(view, activeDay) {
 </button></li>`;
     })
     .join('');
-}
-
-export function renderCredits(view, geocoded) {
-  const links = view.providers
-    .map((id) => PROVIDERS[id])
-    .map(({ label, url }) => `<a href="${url}">${label}</a>`);
-  if (geocoded) links.push('<a href="https://www.openstreetmap.org/copyright">© OpenStreetMap</a>');
-  $('credits').innerHTML = `Daten: ${links.join(' · ')}`;
 }

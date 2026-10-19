@@ -17,7 +17,7 @@ const RAIN = 1;
 
 export async function fetchInca(lat, lon) {
   const params = {
-    parameters: 't2m,rr,pt,ff,fx,rh2m',
+    parameters: 't2m,rr,pt',
     lat_lon: `${lat.toFixed(4)},${lon.toFixed(4)}`,
     output_format: 'geojson',
   };
@@ -40,8 +40,6 @@ export async function fetchInca(lat, lon) {
         rate: rr == null ? null : rr * 4,
         // Only "rain" is a verified code; for anything else the temperature decides.
         type: pt === RAIN ? 'rain' : pt === NO_PRECIPITATION ? null : undefined,
-        wind: p.ff.data[i] == null ? null : p.ff.data[i] * 3.6,
-        gust: p.fx.data[i] == null ? null : p.fx.data[i] * 3.6,
       };
     }),
   };

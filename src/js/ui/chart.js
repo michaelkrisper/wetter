@@ -1,16 +1,19 @@
 // The forecast chart: temperature curve over precipitation bars for the whole
-// week, 24 hours wide on screen. Drag (or wheel) to scroll, tap a point to
-// inspect it. Bar height is the amount, bar opacity the probability. Sun and
-// moon rise/set are marked at their time. Drawn at the container's real pixel
-// size; scrolling only moves a transform, so it stays smooth.
+// week, 12 hours wide on screen (a day jumped to shows all 24). Drag (or wheel)
+// to scroll, tap a point to inspect it. Bar height is the amount, bar opacity
+// the probability. Sun and moon rise/set are marked at their time along the
+// bottom. Drawn at the container's real pixel size; scrolling only moves a
+// transform, so it stays smooth.
 
 import { rainScale, tempColor } from './colors.js';
 import { hour, temp, weekday } from './format.js';
 
 const HOUR = 3_600_000;
-const WINDOW = 24 * HOUR;
+const SPAN = { now: 12 * HOUR, day: 24 * HOUR };
 const LEAD = HOUR; // the default view starts one hour before now
-const PAD = { top: 28, bottom: 18 };
+const PAD = { top: 18, bottom: 36 };
+// Hour labels every hour where they fit, every 3 hours otherwise.
+const HOURLY_LABEL_PX = 24;
 const DESELECT_MS = 8000;
 const TAP_SLOP = 6;
 const f1 = (n) => n.toFixed(1);
@@ -65,8 +68,10 @@ const EVENT_ICONS = {
     '<path class="c-ev-moon" d="M2.6 2A3.6 3.6 0 1 1-1 -3.4 2.8 2.8 0 0 0 2.6 2Z"/><path class="c-ev-arrow" d="M-3 6 0 9 3 6"/>',
 };
 
-// Precipitation: height = amount, opacity = probability (measured nowcast:
-// full). UV bars sit underneath in yellow, so rain covers them where both occur.
+const barHeight = (rate, barMax) => Math.max(2, rainScale(rate) * barMax);
+
+// Precipitation: height = amount, opacity = probability (nowcast: full). UV
+// bars sit underneath in yellow, so rain covers them where both occur.
 function barsSvg({ bars, uv }, { x, plotBottom, barMax }) {
   const rect = (cls, start, end, height, opacity) =>
     `<rect class="${cls}" x="${f1(x(start) + 0.6)}" y="${f1(plotBottom - height)}" width="${f1(Math.max(1, x(end) - x(start) - 1.2))}" height="${f1(height)}" rx="1.5" opacity="${opacity.toFixed(2)}"/>`;
@@ -74,58 +79,47 @@ function barsSvg({ bars, uv }, { x, plotBottom, barMax }) {
     .map((u) => rect('c-uv', u.start, u.end, (Math.min(u.uv, 11) / 11) * barMax * 0.8, 0.55))
     .join('');
   const rainSvg = bars
-    .filter((b) => b.rate >= 0.05 || (b.prob ?? 0) >= 20)
+    .filter((b) => b.rate >= 0.05)
     .map((b) => {
-      const height = b.rate >= 0.05 ? Math.max(2, rainScale(b.rate) * barMax) : 2;
-      return rect('c-bar', b.start, b.end, height, b.prob == null ? 0.95 : 0.15 + (0.85 * b.prob) / 100);
+      const opacity = b.prob == null ? 1 : 0.1 + (0.9 * b.prob) / 100;
+      return rect('c-bar', b.start, b.end, barHeight(b.rate, barMax), opacity);
     })
     .join('');
   return uvSvg + rainSvg;
 }
 
-// One probability label per rain spell, on its most likely hour.
-function probabilityLabels(bars, { x, plotBottom, barMax }) {
-  let svg = '';
-  let spell = [];
-  const flush = () => {
-    const top = spell.reduce((a, b) => (b.prob > a.prob ? b : a), spell[0]);
-    if (top) {
-      const height = Math.max(2, rainScale(top.rate) * barMax);
-      svg += `<text class="c-prob" x="${f1((x(top.start) + x(top.end)) / 2)}" y="${f1(plotBottom - height - 4)}" text-anchor="middle">${top.prob} %</text>`;
-    }
-    spell = [];
-  };
-  for (const b of bars) {
-    if (b.prob != null && b.prob >= 30 && b.rate >= 0.05) spell.push(b);
-    else flush();
-  }
-  flush();
-  return svg;
+// One probability label per rain spell (see model.js), on its most likely
+// hour, above the spell's highest bar.
+function probabilityLabels(spells, { x, plotBottom, barMax }) {
+  return spells
+    .map(
+      ({ top, prob, peak }) =>
+        `<text class="c-prob" x="${f1((x(top.start) + x(top.end)) / 2)}" y="${f1(plotBottom - barHeight(peak, barMax) - 4)}" text-anchor="middle">${prob} %</text>`,
+    )
+    .join('');
 }
 
-// Hour labels every 3 hours, day changes with a line and the weekday, and the
-// sun and moon events in the top band (moved down a row where a weekday is).
-function axisSvg({ from, until, now, events }, { x, h, plotBottom, timezone }) {
+// Day changes with a line and the weekday on top; along the bottom the sun and
+// moon events, and below them the hours.
+function axisSvg({ from, until, now, events }, { x, h, plotBottom, timezone, hourPx }) {
+  const every = hourPx >= HOURLY_LABEL_PX ? 1 : 3;
   let labels = '';
   let midnights = '';
-  const taken = [];
   for (let t = Math.ceil(from / HOUR) * HOUR; t <= until; t += HOUR) {
     const hh = Number(hour(t, timezone));
     const px = x(t);
     if (hh === 0) {
       midnights += `<line class="c-day" x1="${f1(px)}" x2="${f1(px)}" y1="0" y2="${plotBottom}"/><text class="c-label c-weekday" x="${f1(px + 4)}" y="11">${weekday(t, timezone)}</text>`;
-      taken.push([px, px + 26]);
     }
-    if (hh % 3 === 0 && Math.abs(px - x(now)) > 16) {
+    if (hh % every === 0 && Math.abs(px - x(now)) > 22) {
       labels += `<text class="c-label" x="${f1(px)}" y="${h - 4}" text-anchor="middle">${hh}</text>`;
     }
   }
   const icons = events
-    .map(({ time, kind }) => {
-      const px = x(time);
-      const row = taken.some(([a, b]) => px + 7 > a && px - 7 < b) ? 22 : 12;
-      return `<g class="c-ev" transform="translate(${f1(px)} ${row})">${EVENT_ICONS[kind]}</g>`;
-    })
+    .map(
+      ({ time, kind }) =>
+        `<g class="c-ev" transform="translate(${f1(x(time))} ${plotBottom + 11})">${EVENT_ICONS[kind]}</g>`,
+    )
     .join('');
   return { midnights, labels: labels + icons };
 }
@@ -151,6 +145,7 @@ function extremesSvg(points, xy, days) {
 export function createChart(el, { onSelect, onView }) {
   let view = null;
   let size = { w: 0, h: 0 };
+  let span = SPAN.now; // time across the screen
   let scale = 0; // px per ms
   let geometry = null;
   let viewStart = 0; // time at the left edge
@@ -161,7 +156,7 @@ export function createChart(el, { onSelect, onView }) {
   let animation = 0;
 
   const x = (t) => (t - view.timeline.from) * scale;
-  const maxStart = () => Math.max(view.timeline.from, view.timeline.until - WINDOW);
+  const maxStart = () => Math.max(view.timeline.from, view.timeline.until - span);
   const clampStart = (t) => Math.min(maxStart(), Math.max(view.timeline.from, t));
 
   function applyScroll() {
@@ -181,9 +176,9 @@ export function createChart(el, { onSelect, onView }) {
   function draw() {
     if (!view || !size.w || !size.h) return;
     const { timeline, daylight, timezone, days } = view;
-    const { from, until, now, points, bars } = timeline;
+    const { from, until, now, points, spells } = timeline;
     const { w, h } = size;
-    scale = w / WINDOW;
+    scale = w / span;
     const plotTop = PAD.top;
     const plotBottom = h - PAD.bottom;
     const plotH = plotBottom - plotTop;
@@ -213,7 +208,7 @@ export function createChart(el, { onSelect, onView }) {
           `<rect class="c-night" x="${f1(x(a))}" y="0" width="${f1(x(b) - x(a))}" height="${plotBottom}"/>`,
       )
       .join('');
-    const layout = { x, h, plotBottom, barMax: plotH * 0.42, timezone };
+    const layout = { x, h, plotBottom, barMax: plotH * 0.42, timezone, hourPx: HOUR * scale };
     const { midnights, labels } = axisSvg(timeline, layout);
 
     const nowX = x(now);
@@ -227,7 +222,7 @@ ${shade}${midnights}${barsSvg(timeline, layout)}
 <path d="${area}" fill="url(#c-area)"/>
 <path class="c-temp" d="${line}" stroke="url(#c-line)"/>
 <rect class="c-past" x="0" y="0" width="${f1(nowX)}" height="${h}"/>
-${probabilityLabels(bars, layout)}${extremesSvg(points, xy, days)}${labels}
+${probabilityLabels(spells, layout)}${extremesSvg(points, xy, days)}${labels}
 <line class="c-now" x1="${f1(nowX)}" x2="${f1(nowX)}" y1="${plotTop - 2}" y2="${plotBottom}"/>
 <text class="c-label c-now-label" x="${f1(nowX)}" y="${h - 4}" text-anchor="middle">jetzt</text>
 <g class="c-marker" hidden><line y1="0" y2="${plotBottom}"/><circle r="4.5"/></g>
@@ -377,7 +372,11 @@ ${probabilityLabels(bars, layout)}${extremesSvg(points, xy, days)}${labels}
       follow = false;
       activeDay = start;
       notifyView();
-      animateTo(start);
+      if (span === SPAN.day) return animateTo(start);
+      cancelAnimationFrame(animation);
+      span = SPAN.day;
+      viewStart = start;
+      draw();
     },
     showNow() {
       if (!view) return;
@@ -385,7 +384,10 @@ ${probabilityLabels(bars, layout)}${extremesSvg(points, xy, days)}${labels}
       follow = true;
       activeDay = null;
       notifyView();
-      animateTo(view.timeline.now - LEAD);
+      if (span === SPAN.now) return animateTo(view.timeline.now - LEAD);
+      cancelAnimationFrame(animation);
+      span = SPAN.now;
+      draw();
     },
   };
 }

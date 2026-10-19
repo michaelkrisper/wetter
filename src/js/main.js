@@ -1,11 +1,11 @@
-import { DEFAULT_LOCATION, MOVE_THRESHOLD_KM, REFRESH_MS, STALE_MS } from './config.js';
+import { DEFAULT_LOCATION, MOVE_THRESHOLD_KM, REFRESH_MS } from './config.js';
 import { loadForecast } from './forecast.js';
 import { distanceKm, getPosition, placeName } from './location.js';
 import { snapshot } from './model.js';
 import * as storage from './storage.js';
 import { createChart } from './ui/chart.js';
 import { clock } from './ui/format.js';
-import { renderChartHead, renderCredits, renderDays, renderHero } from './ui/render.js';
+import { renderChartHead, renderDays, renderHero } from './ui/render.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -61,7 +61,6 @@ function render() {
   renderHero(view);
   renderChartHead(view, { point, day });
   renderDays(view, day);
-  renderCredits(view, place.gps && place.name !== DEFAULT_LOCATION.name);
   chart.update(view);
   radar?.setLocation(place, view.timezone);
 }
@@ -124,7 +123,7 @@ async function locate() {
   }
 }
 
-const isStale = (limit) => !forecast || Date.now() - forecast.fetchedAt > limit;
+const isStale = () => !forecast || Date.now() - forecast.fetchedAt > REFRESH_MS;
 
 // Tabs: the weather overview and the radar, which is loaded on first use.
 async function showTab(name) {
@@ -171,16 +170,18 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) return;
   chart.showNow();
   render();
-  if (isStale(STALE_MS)) {
+  radar?.refresh();
+  if (isStale()) {
     refresh();
     locate();
   }
 });
 
+// Only a check; the data itself is refreshed every REFRESH_MS.
 setInterval(() => {
   if (document.hidden) return;
-  if (isStale(REFRESH_MS) && !loading) refresh();
-  else render();
+  radar?.refresh();
+  if (isStale() && !loading) refresh();
 }, 60_000);
 
 // iOS ignores user-scalable=no; block pinch and double-tap zoom explicitly.

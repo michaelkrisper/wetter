@@ -6,14 +6,7 @@ import { getJson, query } from './http.js';
 
 const ENDPOINT = 'https://api.open-meteo.com/v1/forecast';
 
-const CURRENT = [
-  'temperature_2m',
-  'apparent_temperature',
-  'weather_code',
-  'wind_speed_10m',
-  'wind_gusts_10m',
-  'is_day',
-];
+const CURRENT = ['temperature_2m', 'weather_code', 'is_day'];
 const MINUTELY = ['temperature_2m', 'precipitation', 'weather_code'];
 const HOURLY = [
   'temperature_2m',
@@ -119,16 +112,23 @@ function normalize(data, model) {
   const fullyCovered = (dayStart) =>
     covered.has(dayStart) && covered.has(dayStart + 23 * 3600_000) && covered.size > 0;
 
-  const daily = d.time.map(ms).map((time, i) => {
+  const daily = d.time.map(ms).map((time, i, starts) => {
     const regional = model && fullyCovered(time);
     const pick = (name) => (regional ? (column(d, name, model)?.[i] ?? null) : null);
     const base = (name) => column(d, name, 'best_match')?.[i] ?? null;
+    // The day's rain from the same hours the chart shows, so both agree also on
+    // days the regional model covers only partly.
+    const hours = hourly.filter((x) => x.time >= time && x.time < (starts[i + 1] ?? time + 24 * 3600_000));
+    const hourlySum =
+      hours.length >= 23 && hours.every((x) => x.precip != null)
+        ? hours.reduce((sum, x) => sum + x.precip, 0)
+        : null;
     return {
       time,
       code: base('weather_code'),
       tempMax: pick('temperature_2m_max') ?? base('temperature_2m_max'),
       tempMin: pick('temperature_2m_min') ?? base('temperature_2m_min'),
-      precipSum: pick('precipitation_sum') ?? base('precipitation_sum'),
+      precipSum: hourlySum ?? pick('precipitation_sum') ?? base('precipitation_sum'),
       precipProb: base('precipitation_probability_max'),
       uvMax: base('uv_index_max'),
       sunrise: ms(base('sunrise')),
@@ -145,10 +145,7 @@ function normalize(data, model) {
     current: {
       time: ms(c.time),
       temp: c.temperature_2m,
-      feelsLike: c.apparent_temperature,
       code: c.weather_code,
-      wind: c.wind_speed_10m,
-      gust: c.wind_gusts_10m,
       isDay: c.is_day === 1,
     },
     minutely,

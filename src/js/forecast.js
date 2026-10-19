@@ -6,18 +6,13 @@
 //   .. +7 days       daily                     Open-Meteo best match (ECMWF, ICON, GFS, ...)
 
 import { NOWCAST_MINUTES } from './config.js';
-import { inBox, MODELS, regionFor } from './regions.js';
+import { inBox, regionFor } from './regions.js';
 import { fetchInca, INCA_BOX } from './sources/geosphere.js';
 import { fetchOpenMeteo } from './sources/open-meteo.js';
 
 export const NOWCASTS = {
   inca: { label: 'INCA', detail: '1 km · 15 min', provider: 'geosphere', box: INCA_BOX, fetch: fetchInca },
   openmeteo: { label: 'Modell', detail: '15 min', provider: 'openmeteo' },
-};
-
-export const PROVIDERS = {
-  geosphere: { label: 'GeoSphere Austria', url: 'https://data.hub.geosphere.at' },
-  openmeteo: { label: 'Open-Meteo', url: 'https://open-meteo.com' },
 };
 
 // A nowcast must still reach the end of the window and must not be stale
@@ -57,8 +52,6 @@ function fromModel(minutely) {
 }
 
 function assemble({ lat, lon }, region, model, nowcast) {
-  const used = new Set(['openmeteo', NOWCASTS[nowcast.provider].provider]);
-  if (model.model) used.add(MODELS[model.model].provider);
   return {
     version: 1,
     fetchedAt: Date.now(),
@@ -71,7 +64,6 @@ function assemble({ lat, lon }, region, model, nowcast) {
     minutely: model.minutely,
     hourly: model.hourly,
     daily: model.daily,
-    providers: [...used],
   };
 }
 
