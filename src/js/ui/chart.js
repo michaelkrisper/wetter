@@ -69,15 +69,14 @@ const EVENT_ICONS = {
 };
 
 const barHeight = (rate, barMax) => Math.max(2, rainScale(rate) * barMax);
+const uvHeight = (uv, barMax) => (Math.min(uv, 11) / 11) * barMax * 0.8;
 
 // Precipitation: height = amount, opacity = probability (nowcast: full). UV
 // bars sit underneath in yellow, so rain covers them where both occur.
 function barsSvg({ bars, uv }, { x, plotBottom, barMax }) {
   const rect = (cls, start, end, height, opacity) =>
     `<rect class="${cls}" x="${f1(x(start) + 0.6)}" y="${f1(plotBottom - height)}" width="${f1(Math.max(1, x(end) - x(start) - 1.2))}" height="${f1(height)}" rx="1.5" opacity="${opacity.toFixed(2)}"/>`;
-  const uvSvg = uv
-    .map((u) => rect('c-uv', u.start, u.end, (Math.min(u.uv, 11) / 11) * barMax * 0.8, 0.55))
-    .join('');
+  const uvSvg = uv.map((u) => rect('c-uv', u.start, u.end, uvHeight(u.uv, barMax), 0.55)).join('');
   const rainSvg = bars
     .filter((b) => b.rate >= 0.05)
     .map((b) => {
@@ -122,6 +121,19 @@ function axisSvg({ from, until, now, events }, { x, h, plotBottom, timezone, hou
     )
     .join('');
   return { midnights, labels: labels + icons };
+}
+
+// Highest UV index of every day, above its bar.
+function uvLabels(uv, days, { x, plotBottom, barMax }) {
+  let svg = '';
+  for (const { time: start } of days) {
+    const inDay = uv.filter((u) => u.start + HOUR / 2 >= start && u.start + HOUR / 2 < start + 24 * HOUR);
+    if (!inDay.length) continue;
+    const top = inDay.reduce((a, b) => (b.uv > a.uv ? b : a));
+    if (Math.round(top.uv) < 1) continue;
+    svg += `<text class="c-uv-max" x="${f1((x(top.start) + x(top.end)) / 2)}" y="${f1(plotBottom - uvHeight(top.uv, barMax) - 4)}" text-anchor="middle">UV ${Math.round(top.uv)}</text>`;
+  }
+  return svg;
 }
 
 // Warmest and coldest point of every day, right on the curve.
@@ -222,7 +234,7 @@ ${shade}${midnights}${barsSvg(timeline, layout)}
 <path d="${area}" fill="url(#c-area)"/>
 <path class="c-temp" d="${line}" stroke="url(#c-line)"/>
 <rect class="c-past" x="0" y="0" width="${f1(nowX)}" height="${h}"/>
-${probabilityLabels(spells, layout)}${extremesSvg(points, xy, days)}${labels}
+${uvLabels(timeline.uv, days, layout)}${probabilityLabels(spells, layout)}${extremesSvg(points, xy, days)}${labels}
 <line class="c-now" x1="${f1(nowX)}" x2="${f1(nowX)}" y1="${plotTop - 2}" y2="${plotBottom}"/>
 <text class="c-label c-now-label" x="${f1(nowX)}" y="${h - 4}" text-anchor="middle">jetzt</text>
 <g class="c-marker" hidden><line y1="0" y2="${plotBottom}"/><circle r="4.5"/></g>

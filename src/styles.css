@@ -230,33 +230,6 @@ h2 {
   font-size: 30px;
 }
 
-.hero-facts {
-  display: grid;
-  grid-template-columns: auto auto;
-  justify-content: start;
-  column-gap: 18px;
-  row-gap: 2px;
-  margin: 2px 0 0;
-  font-size: 14px;
-}
-
-.hero-facts div {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  white-space: nowrap;
-}
-
-.hero-facts dt {
-  color: var(--faint);
-  font-size: 12px;
-}
-
-.hero-facts dd {
-  margin: 0;
-  font-weight: 500;
-}
-
 /* Cards */
 
 .card {
@@ -426,6 +399,15 @@ h2 {
   stroke-width: 2.5;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.c-uv-max {
+  fill: var(--sun);
+  font-size: 10px;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--card);
+  stroke-width: 3px;
 }
 
 .c-extreme {
@@ -649,8 +631,7 @@ circle.i-sun {
 
 /* Before the first forecast arrives */
 
-.is-empty .card,
-.is-empty .hero-facts {
+.is-empty .card {
   opacity: 0.45;
 }
 

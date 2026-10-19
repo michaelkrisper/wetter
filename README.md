@@ -20,8 +20,9 @@ together from several weather services into one continuous forecast.
 - **Everything at a glance.** Current conditions, a one-line precipitation
   outlook, a combined chart and 7 days on a single screen. No scrolling, no
   zooming, no settings.
-- **One chart for the whole week.** Temperature curve over precipitation bars
-  (height = amount, opacity = probability) and UV bars, with sunrise/sunset
+- **One chart for the whole week.** Temperature curve with each day's high
+  and low over precipitation bars (height = amount, opacity = probability)
+  and UV bars with the daily maximum, with sunrise/sunset
   and moonrise/moonset marked at their time. 12 hours wide with hourly
   labels; drag sideways to scroll, tap a point for its values, tap a day in
   the list to see its 00-24 h.

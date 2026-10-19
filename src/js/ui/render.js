@@ -63,15 +63,12 @@ function glow(code, isDay) {
 }
 
 export function renderHero(view) {
-  const { current, days } = view;
+  const { current } = view;
   const { label, icon } = describe(current.code, current.isDay);
   $('temp').textContent = temp(current.temp);
   $('cond-icon').innerHTML = weatherIcon(icon, current.isDay);
   $('cond').textContent = label;
-  $('hi').textContent = temp(days[0]?.tempMax);
-  $('lo').textContent = temp(days[0]?.tempMin);
 
-  $('uv').textContent = Math.round(current.uv ?? 0);
   document.documentElement.style.setProperty('--glow', glow(current.code, current.isDay));
 }
 

@@ -117,7 +117,6 @@ function currentView(forecast, now, steps, today) {
     temp,
     code: observedCode(base.code, steps?.[0], nowcast.provider),
     isDay: today?.sunrise ? now >= today.sunrise && now < today.sunset : base.isDay,
-    uv: interpolate(hourly, now, 'uv') ?? 0,
   };
 }
 

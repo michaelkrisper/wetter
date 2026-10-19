@@ -11,10 +11,13 @@ All notable changes to this project are documented here. The format follows
   shows its whole 24 hours. Sun and moon events moved to the bottom.
 - Rain bars: height is the amount, opacity the probability; hours without an
   expected amount get no bar.
-- The outlook quotes the probability of the whole rain spell, the same number
-  the chart shows; a day's precipitation sum comes from the same hours as the
-  chart.
-- "Feels like" and wind removed from the header.
+- The outlook quotes the probability and amount of the whole rain spell, the
+  same numbers the chart shows.
+- Header shows only temperature and condition: "feels like", wind, high/low
+  and UV are gone (high/low and the daily UV maximum are labelled in the
+  chart). The data credits line below the days is gone too.
+- A day's high, low and precipitation sum come from the same hours as the
+  chart, so the list and the chart show the same numbers.
 - Data refreshes every 10 minutes (was 5) and no longer re-renders every minute.
 - 20 px more space at the top, clear of the iOS status bar blur.
 
