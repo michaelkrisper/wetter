@@ -124,7 +124,7 @@ describe('app in a browser', { skip: !chrome && 'no Chrome found', timeout: 60_0
       let log = '';
       browser.stderr.on('data', (chunk) => {
         log += chunk;
-        const match = log.match(/DevTools listening on (ws:\/\/\S+)/);
+        const match = log.match(/DevTools listening on (ws:\/\/\S+)\r?\n/);
         if (match) resolve(match[1]);
       });
       browser.on('exit', () => reject(new Error(`Chrome exited:\n${log}`)));
@@ -174,11 +174,16 @@ describe('app in a browser', { skip: !chrome && 'no Chrome found', timeout: 60_0
     await waitFor(`!document.body.classList.contains('is-empty')`);
   });
 
-  after(() => {
+  after(async () => {
     cdp?.close();
-    browser?.kill();
+    if (browser?.exitCode === null) {
+      const exited = new Promise((resolve) => browser.once('exit', resolve));
+      browser.kill();
+      await exited;
+    }
     server?.close();
-    if (profile) rmSync(profile, { recursive: true, force: true });
+    // Chrome's helper processes may still be writing for a moment.
+    if (profile) rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
   it('shows Graz with seven distinct days and the week chart', async () => {
