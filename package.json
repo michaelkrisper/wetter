@@ -1,6 +1,6 @@
 {
   "name": "wetter",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "Minimalist weather PWA: minute-precise nowcast for the next 90 minutes, then hourly and daily, seamlessly blended from GeoSphere Austria and Open-Meteo.",
   "homepage": "https://michaelkrisper.github.io/wetter/",
   "repository": {
@@ -20,7 +20,8 @@
     "lint": "biome check",
     "lint:fix": "biome check --write",
     "borders": "node scripts/build-borders.mjs",
-    "check": "npm run lint"
+    "test": "node --test \"test/*.test.js\"",
+    "check": "npm run lint && npm test"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15"

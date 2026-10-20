@@ -3,6 +3,16 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.4.3] - 2026-10-20
+
+### Added
+
+- Tests with Node's built-in runner, no new dependencies: the forecast model
+  (outlook, rain spells, bars, temperature blending), the sources (Open-Meteo
+  incl. the summer time change, INCA, geocoding, radar grid), loading and
+  fallbacks, and the app itself in headless Chrome with all services answered
+  from fixtures. CI runs them before every deploy.
+
 ## [1.4.2] - 2026-10-20
 
 ### Changed

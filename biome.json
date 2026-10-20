@@ -11,6 +11,7 @@
       "src/**/*.css",
       "src/**/*.webmanifest",
       "scripts/**/*.mjs",
+      "test/**/*.js",
       "*.json",
       "!src/vendor"
     ]

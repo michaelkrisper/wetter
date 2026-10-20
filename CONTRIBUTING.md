@@ -19,7 +19,8 @@ There is no build step; the files in `src/` are the app.
 
 ```sh
 npm run lint:fix     # Biome: format and lint
-npm run check        # what CI runs
+npm test             # unit tests, and the app in headless Chrome if installed
+npm run check        # what CI runs: lint and tests
 ```
 
 Check the layout on a small phone (375 x 667) and a large one (412 x 915) in
