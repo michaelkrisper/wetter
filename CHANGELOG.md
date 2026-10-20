@@ -3,6 +3,28 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.4.0] - 2026-10-20
+
+### Added
+
+- Place search: tap the place name to choose another place or go back to the
+  device's position. A chosen place is kept until then.
+- Day and night in the chart: a light sky by day, a dark one with stars by
+  night, fading over the hour around sunrise and sunset.
+
+### Changed
+
+- Rain spells are labelled with their amount instead of the probability,
+  which is in the bars' opacity; unlikely rain is much paler.
+- UV bars are scaled to the week's highest index.
+- The temperature axis also takes in half a screen beyond the edges, fading
+  with distance, so it glides instead of jumping while scrolling.
+
+### Fixed
+
+- After the change from summer time, days started an hour early: the last
+  day was labelled like the one before.
+
 ## [1.3.0] - 2026-10-19
 
 ### Changed

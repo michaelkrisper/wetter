@@ -41,7 +41,7 @@
   <main id="view-weather" class="view-weather">
     <header class="hero">
       <div class="topline">
-        <button id="place-btn" class="place" type="button" aria-label="Standort neu bestimmen">
+        <button id="place-btn" class="place" type="button" aria-label="Ort wählen">
           <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 21 3l-8.5 18-2-7.5Z"/></svg>
           <span id="place">Graz</span>
         </button>
@@ -86,5 +86,14 @@
     </button>
   </nav>
 </div>
+<dialog id="picker" class="picker" aria-label="Ort wählen">
+  <form class="picker-form" role="search">
+    <input type="search" placeholder="Ort suchen" aria-label="Ort suchen" autocomplete="off" autocapitalize="words" enterkeyhint="search">
+    <button class="icon-btn" type="button" data-close aria-label="Schließen">
+      <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6 18 18M18 6 6 18"/></svg>
+    </button>
+  </form>
+  <ul class="picker-list"></ul>
+</dialog>
 </body>
 </html>

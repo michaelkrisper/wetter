@@ -21,11 +21,12 @@ together from several weather services into one continuous forecast.
   outlook, a combined chart and 7 days on a single screen. No scrolling, no
   zooming, no settings.
 - **One chart for the whole week.** Temperature curve with each day's high
-  and low over precipitation bars (height = amount, opacity = probability)
-  and UV bars with the daily maximum, with sunrise/sunset
-  and moonrise/moonset marked at their time. 12 hours wide with hourly
-  labels; drag sideways to scroll, tap a point for its values, tap a day in
-  the list to see its 00-24 h.
+  and low over precipitation bars (height = amount, opacity = probability,
+  each spell labelled with its amount) and UV bars with the daily maximum,
+  on a sky that is light by day and dark with stars by night, with
+  sunrise/sunset and moonrise/moonset marked at their time. 12 hours wide
+  with hourly labels; drag sideways to scroll, tap a point for its values,
+  tap a day in the list to see its 00-24 h.
 - **Precision where it matters.** The closer the time, the finer the data:
   1 km / 15-minute nowcast for the next 90 minutes, a 2.5 km national model
   for the next days, global models for the rest of the week.
@@ -36,7 +37,9 @@ together from several weather services into one continuous forecast.
 - **Rain radar** on a second tab: the last two hours plus a forecast for the
   next 2.5-3 hours, animated. Pinch, wheel or double tap to zoom, drag to pan.
 - **Location aware.** Starts instantly with Graz (or the last known position),
-  then switches services if GPS says you are somewhere else.
+  then switches services if GPS says you are somewhere else. Tap the place
+  name to search for another one; a place chosen by hand stays until you pick
+  "Mein Standort" again.
 - **Fast.** No framework, no build, ~30 kB of compressed code for the main
   screen; the radar and its HDF5 decoder load on first use. The last
   forecast is shown immediately from cache, the app shell works offline.
@@ -110,7 +113,7 @@ src/
     ├── borders.js        generated country outlines (scripts/build-borders.mjs)
     ├── forecast.js       fetches all sources in parallel and assembles them
     ├── model.js          pure: stored forecast + time -> what the screen shows
-    ├── sources/          one module per API (Open-Meteo, GeoSphere, Nominatim, radar grids)
+    ├── sources/          one module per API (Open-Meteo, GeoSphere, Nominatim, geocoding, radar grids)
     └── ui/               rendering, week chart, radar tab (lazy-loaded), icons
 ```
 
@@ -140,8 +143,9 @@ start, and finishes with a smoke test against the live site.
 
 - [GeoSphere Austria](https://data.hub.geosphere.at): INCA nowcast (point and
   grid) and AROME, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
-- [Open-Meteo](https://open-meteo.com): forecast API,
-  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+- [Open-Meteo](https://open-meteo.com): forecast and geocoding API,
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); place search data
+  from [GeoNames](https://www.geonames.org), CC BY 4.0
 - [RainViewer](https://www.rainviewer.com): radar tiles
 - [Esri](https://www.esri.com): dark grey basemap (Esri, HERE, Garmin,
   © OpenStreetMap contributors)

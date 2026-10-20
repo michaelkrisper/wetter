@@ -329,8 +329,16 @@ h2 {
     sans-serif;
 }
 
-.c-night {
-  fill: rgb(129 140 248 / 0.045);
+.c-sky-day {
+  stop-color: rgb(186 214 255 / 0.22);
+}
+
+.c-sky-night {
+  stop-color: rgb(0 0 8 / 0.55);
+}
+
+.c-star {
+  fill: #e0e7ff;
 }
 
 .c-day {
@@ -355,10 +363,17 @@ h2 {
   fill: var(--sun);
 }
 
-.c-prob {
+.c-cut {
+  fill: #000;
+}
+
+.c-amount {
   fill: var(--rain);
   font-size: 10px;
   font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--card);
+  stroke-width: 3px;
 }
 
 .c-past {
@@ -633,8 +648,90 @@ circle.i-sun {
 
 /* Before the first forecast arrives */
 
-.is-empty .card {
+.is-empty .card,
+.is-empty .hero-main {
   opacity: 0.45;
+}
+
+/* Place picker */
+
+.picker {
+  width: min(100% - 20px, 480px);
+  max-height: calc(100% - var(--top) - 20px);
+  margin: var(--top) auto auto;
+  padding: 10px 14px 4px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--card);
+  color: var(--text);
+  overflow: auto;
+}
+
+.picker::backdrop {
+  background: rgb(0 0 0 / 0.6);
+}
+
+.picker-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.picker-form input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+  /* 16 px or more, or iOS zooms in on focus. */
+  font: inherit;
+  font-size: 17px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.picker-list {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.picker-list button {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  min-height: 46px;
+  padding: 8px 2px;
+  border-top: 1px solid var(--border);
+  font-size: 16px;
+  text-align: left;
+}
+
+.picker-list li:first-child button {
+  border-top: 0;
+}
+
+.picker-list small {
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--faint);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.picker-list .picker-gps {
+  align-items: center;
+  color: var(--accent);
+}
+
+.picker-note {
+  padding: 10px 2px;
+  font-size: 14px;
+  color: var(--faint);
 }
 
 /* Rain radar */

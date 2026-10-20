@@ -77,6 +77,21 @@ function series(block, name, model, useRegional = REGIONAL.has(name)) {
 
 const ms = (unix) => (unix == null ? null : unix * 1000);
 
+// UTC offset of a time zone at an instant, in ms.
+function zoneOffset(time, timeZone) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+  }).formatToParts(time);
+  const v = Object.fromEntries(parts.map((p) => [p.type, Number(p.value)]));
+  return Date.UTC(v.year, v.month - 1, v.day, v.hour, v.minute) - (time - (time % 60_000));
+}
+
 function normalize(data, model) {
   const { current: c, minutely_15: m, hourly: h, daily: d } = data;
 
@@ -112,7 +127,11 @@ function normalize(data, model) {
   const fullyCovered = (dayStart) =>
     covered.has(dayStart) && covered.has(dayStart + 23 * 3600_000) && covered.size > 0;
 
-  const daily = d.time.map(ms).map((time, i, starts) => {
+  // Days start at midnight of today's UTC offset, an hour off after a daylight
+  // saving change; moved to the zone's real midnight.
+  const offset = data.utc_offset_seconds * 1000;
+  const starts = d.time.map((unix) => unix * 1000 + offset - zoneOffset(unix * 1000, data.timezone));
+  const daily = starts.map((time, i) => {
     const regional = model && fullyCovered(time);
     const pick = (name) => (regional ? (column(d, name, model)?.[i] ?? null) : null);
     const base = (name) => column(d, name, 'best_match')?.[i] ?? null;

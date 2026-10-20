@@ -5,6 +5,7 @@ import { snapshot } from './model.js';
 import * as storage from './storage.js';
 import { createChart } from './ui/chart.js';
 import { clock } from './ui/format.js';
+import { createPicker } from './ui/picker.js';
 import { renderChartHead, renderDays, renderHero } from './ui/render.js';
 
 const $ = (id) => document.getElementById(id);
@@ -91,22 +92,36 @@ async function refresh() {
   render();
 }
 
+// A different place: its forecast replaces the old one, which is not shown
+// meanwhile under the new name.
+function moveTo(next) {
+  place = next;
+  forecast = null;
+  point = null;
+  chart.showNow();
+  render();
+  refresh();
+}
+
 // The forecast for the last known place is already on its way; the position
-// only matters if it is noticeably somewhere else.
+// only matters if it is noticeably somewhere else. A place chosen by hand
+// stays until the device's position is asked for again.
 async function locate() {
+  if (place.manual) return;
   let here;
   try {
     here = await getPosition();
   } catch {
     return;
   }
+  // Unless a place was chosen meanwhile.
+  if (!place.manual) usePosition(here);
+}
+
+async function usePosition(here) {
   const moved = distanceKm(here, place) > MOVE_THRESHOLD_KM;
-  if (moved) {
-    place = { ...here, name: null, gps: true };
-    refresh();
-  } else {
-    place = { ...place, gps: true };
-  }
+  if (moved) moveTo({ ...here, name: null, gps: true });
+  else place = { ...place, gps: true, manual: false };
   storage.set('location', place);
   renderStatus();
   if (moved || !place.name) {
@@ -156,7 +171,21 @@ $('reload').addEventListener('click', () => {
   refresh();
   locate();
 });
-$('place-btn').addEventListener('click', () => locate());
+const picker = createPicker($('picker'), {
+  onPick(next) {
+    const chosen = { lat: next.lat, lon: next.lon, name: next.name, gps: false, manual: true };
+    storage.set('location', chosen);
+    if (distanceKm(chosen, place) > MOVE_THRESHOLD_KM) moveTo(chosen);
+    else place = chosen;
+    render();
+  },
+  // Resolves once the position is known; the place name follows.
+  async onLocate() {
+    const here = await getPosition();
+    usePosition(here);
+  },
+});
+$('place-btn').addEventListener('click', () => picker.open());
 $('chart-now').addEventListener('click', () => chart.showNow());
 $('days').addEventListener('click', (e) => {
   const button = e.target.closest('[data-day]');

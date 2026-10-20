@@ -26,12 +26,14 @@ const SHELL = [
   'js/sources/open-meteo.js',
   'js/sources/geosphere.js',
   'js/sources/nominatim.js',
+  'js/sources/geocoding.js',
   'js/sources/radar-grid.js',
   'js/ui/chart.js',
   'js/ui/colors.js',
   'js/ui/format.js',
   'js/ui/icons.js',
   'js/ui/render.js',
+  'js/ui/picker.js',
   'js/ui/radar.js',
 ];
 

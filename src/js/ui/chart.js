@@ -6,7 +6,7 @@
 // transform, so it stays smooth.
 
 import { rainScale, tempColor } from './colors.js';
-import { hour, temp, weekday } from './format.js';
+import { decimal, hour, temp, weekday } from './format.js';
 
 const HOUR = 3_600_000;
 const SPAN = { now: 12 * HOUR, day: 24 * HOUR };
@@ -17,6 +17,9 @@ const HOURLY_LABEL_PX = 24;
 // The temperature axis fits what is on screen, but spans at least this many
 // degrees, so a calm night stays calm.
 const MIN_SPAN = 4;
+// ... plus what lies up to this share of a screen beyond either edge, fading
+// with distance, so the axis glides instead of jumping while scrolling.
+const FIT_MARGIN = 0.5;
 const DESELECT_MS = 8000;
 const TAP_SLOP = 6;
 const f1 = (n) => n.toFixed(1);
@@ -50,6 +53,11 @@ function monotonePath(pts) {
   return d;
 }
 
+// Sky behind the chart: light by day, dark by night, with twilight fading
+// over this long around sunrise and sunset, and stars in the dark hours.
+const TWILIGHT = 60 * 60_000;
+const STAR_PX = 1600; // one star per this many square px of night sky
+
 function nights(daylight, from, until) {
   const result = [];
   let cursor = from;
@@ -62,6 +70,44 @@ function nights(daylight, from, until) {
   return result;
 }
 
+function skyStops(daylight, from, until, x) {
+  const width = x(until);
+  const stop = (t, cls) =>
+    `<stop offset="${Math.min(1, Math.max(0, x(t) / width)).toFixed(4)}" class="${cls}"/>`;
+  let stops = stop(from, 'c-sky-night');
+  for (const [rise, set] of daylight) {
+    if (set + TWILIGHT <= from || rise - TWILIGHT >= until) continue;
+    stops += stop(rise - TWILIGHT, 'c-sky-night') + stop(rise + TWILIGHT, 'c-sky-day');
+    stops += stop(set - TWILIGHT, 'c-sky-day') + stop(set + TWILIGHT, 'c-sky-night');
+  }
+  return stops + stop(until, 'c-sky-night');
+}
+
+// Scattered by a fixed hash of the time, so the stars stay put across redraws.
+function starsSvg(daylight, from, until, x, top, bottom) {
+  let svg = '';
+  for (const [a, b] of nights(daylight, from, until)) {
+    const start = a + TWILIGHT;
+    const end = b - TWILIGHT;
+    if (end <= start) continue;
+    const count = Math.round(((x(end) - x(start)) * (bottom - top)) / STAR_PX);
+    for (let i = 0; i < count; i++) {
+      const r1 = hash(start + i * 7919);
+      const r2 = hash(start + i * 104_729 + 1);
+      const r3 = hash(start + i * 15_485_863 + 2);
+      const cx = x(start + r1 * (end - start));
+      const cy = top + r2 ** 1.6 * (bottom - top);
+      svg += `<circle class="c-star" cx="${f1(cx)}" cy="${f1(cy)}" r="${(0.5 + r3 * 0.7).toFixed(2)}" opacity="${(0.25 + r3 * 0.55).toFixed(2)}"/>`;
+    }
+  }
+  return svg;
+}
+
+function hash(n) {
+  const v = Math.sin(n * 12.9898 + 78.233) * 43_758.5453;
+  return v - Math.floor(v);
+}
+
 const EVENT_ICONS = {
   sunrise: '<circle class="c-ev-sun" r="3.2"/><path class="c-ev-arrow" d="M-3 -6 0 -9 3 -6"/>',
   sunset: '<circle class="c-ev-sun" r="3.2"/><path class="c-ev-arrow" d="M-3 6 0 9 3 6"/>',
@@ -72,30 +118,34 @@ const EVENT_ICONS = {
 };
 
 const barHeight = (rate, barMax) => Math.max(2, rainScale(rate) * barMax);
-const uvHeight = (uv, barMax) => (Math.min(uv, 11) / 11) * barMax * 0.8;
+// The week's highest UV index fills the bar area.
+const uvHeight = (uv, { barMax, uvMax }) => (uv / uvMax) * barMax;
+// Unlikely rain fades out quickly: 10 % is just visible, 50 % still pale.
+const rainOpacity = (prob) => (prob == null ? 1 : 0.07 + 0.93 * (prob / 100) ** 2);
 
 // Precipitation: height = amount, opacity = probability (nowcast: full). UV
-// bars sit underneath in yellow, so rain covers them where both occur.
-function barsSvg({ bars, uv }, { x, plotBottom, barMax }) {
+// bars sit underneath in yellow, cut out where it rains, so a pale rain bar
+// does not turn green.
+function barsSvg({ bars, uv, until }, layout) {
+  const { x, plotBottom, barMax } = layout;
   const rect = (cls, start, end, height, opacity) =>
     `<rect class="${cls}" x="${f1(x(start) + 0.6)}" y="${f1(plotBottom - height)}" width="${f1(Math.max(1, x(end) - x(start) - 1.2))}" height="${f1(height)}" rx="1.5" opacity="${opacity.toFixed(2)}"/>`;
-  const uvSvg = uv.map((u) => rect('c-uv', u.start, u.end, uvHeight(u.uv, barMax), 0.55)).join('');
-  const rainSvg = bars
-    .filter((b) => b.rate >= 0.05)
-    .map((b) => {
-      const opacity = b.prob == null ? 1 : 0.1 + (0.9 * b.prob) / 100;
-      return rect('c-bar', b.start, b.end, barHeight(b.rate, barMax), opacity);
-    })
-    .join('');
-  return uvSvg + rainSvg;
+  const uvSvg = uv.map((u) => rect('c-uv', u.start, u.end, uvHeight(u.uv, layout), 0.55)).join('');
+  const rain = bars.filter((b) => b.rate >= 0.05);
+  const rainSvg = (cls, opacity) =>
+    rain.map((b) => rect(cls, b.start, b.end, barHeight(b.rate, barMax), opacity(b.prob))).join('');
+  const width = f1(x(until));
+  const cut = `<mask id="c-uv-cut" maskUnits="userSpaceOnUse" x="0" y="0" width="${width}" height="${plotBottom}"><rect width="${width}" height="${plotBottom}" fill="#fff"/>${rainSvg('c-cut', () => 1)}</mask>`;
+  return `${cut}<g mask="url(#c-uv-cut)">${uvSvg}</g>${rainSvg('c-bar', rainOpacity)}`;
 }
 
-// One probability label per rain spell (see model.js), above its highest bar.
-function probabilityLabels(spells, { x, plotBottom, barMax }) {
+// The amount of every rain spell (see model.js) above its highest bar; the
+// probability is in the bars' opacity.
+function amountLabels(spells, { x, plotBottom, barMax }) {
   return spells
     .map(
-      ({ wettest, prob, peak }) =>
-        `<text class="c-prob" x="${f1((x(wettest.start) + x(wettest.end)) / 2)}" y="${f1(plotBottom - barHeight(peak, barMax) - 4)}" text-anchor="middle">${prob} %</text>`,
+      ({ wettest, prob, peak, total }) =>
+        `<text class="c-amount" x="${f1((x(wettest.start) + x(wettest.end)) / 2)}" y="${f1(plotBottom - barHeight(peak, barMax) - 4)}" text-anchor="middle" fill-opacity="${Math.max(0.5, rainOpacity(prob)).toFixed(2)}">${decimal(total, total < 10 ? 1 : 0)} mm</text>`,
     )
     .join('');
 }
@@ -126,14 +176,15 @@ function axisSvg({ from, until, now, events }, { x, h, plotBottom, timezone, hou
 }
 
 // Highest UV index of every day, above its bar.
-function uvLabels(uv, days, { x, plotBottom, barMax }) {
+function uvLabels(uv, days, layout) {
+  const { x, plotBottom } = layout;
   let svg = '';
   for (const { time: start } of days) {
     const inDay = uv.filter((u) => u.start + HOUR / 2 >= start && u.start + HOUR / 2 < start + 24 * HOUR);
     if (!inDay.length) continue;
     const top = inDay.reduce((a, b) => (b.uv > a.uv ? b : a));
     if (Math.round(top.uv) < 1) continue;
-    svg += `<text class="c-uv-max" x="${f1((x(top.start) + x(top.end)) / 2)}" y="${f1(plotBottom - uvHeight(top.uv, barMax) - 4)}" text-anchor="middle">UV ${Math.round(top.uv)}</text>`;
+    svg += `<text class="c-uv-max" x="${f1((x(top.start) + x(top.end)) / 2)}" y="${f1(plotBottom - uvHeight(top.uv, layout) - 4)}" text-anchor="middle">UV ${Math.round(top.uv)}</text>`;
   }
   return svg;
 }
@@ -191,16 +242,21 @@ export function createChart(el, { onSelect, onView }) {
 
   function targetFit() {
     const { points, lo, hi, tempBottom, tempH } = geometry;
-    const from = viewStart - HOUR;
-    const to = viewStart + span + HOUR;
-    let vlo = Infinity;
-    let vhi = -Infinity;
+    const from = viewStart;
+    const to = viewStart + span;
+    const margin = span * FIT_MARGIN;
+    const visible = points.filter((p) => p.time >= from && p.time <= to).map((p) => p.temp);
+    if (!visible.length) return { a: 1, b: 0 };
+    let vlo = Math.min(...visible);
+    let vhi = Math.max(...visible);
+    const [inLo, inHi] = [vlo, vhi];
     for (const p of points) {
-      if (p.time < from || p.time > to) continue;
-      vlo = Math.min(vlo, p.temp);
-      vhi = Math.max(vhi, p.temp);
+      const distance = Math.max(from - p.time, p.time - to);
+      if (distance <= 0 || distance >= margin) continue;
+      const weight = 1 - distance / margin;
+      vlo = Math.min(vlo, inLo + (p.temp - inLo) * weight);
+      vhi = Math.max(vhi, inHi + (p.temp - inHi) * weight);
     }
-    if (!Number.isFinite(vlo)) return { a: 1, b: 0 };
     const minSpan = Math.min(MIN_SPAN, hi - lo);
     if (vhi - vlo < minSpan) {
       const mid = Math.min(hi - minSpan / 2, Math.max(lo + minSpan / 2, (vhi + vlo) / 2));
@@ -276,13 +332,9 @@ export function createChart(el, { onSelect, onView }) {
     const stops = [0, 0.25, 0.5, 0.75, 1]
       .map((o) => `<stop offset="${o}" stop-color="${tempColor(hi - o * (hi - lo))}"/>`)
       .join('');
-    const shade = nights(daylight, from, until)
-      .map(
-        ([a, b]) =>
-          `<rect class="c-night" x="${f1(x(a))}" y="0" width="${f1(x(b) - x(a))}" height="${plotBottom}"/>`,
-      )
-      .join('');
-    const layout = { x, h, plotBottom, barMax: plotH * 0.42, timezone, hourPx: HOUR * scale };
+    const sky = `<rect fill="url(#c-sky)" x="0" y="0" width="${f1(x(until))}" height="${plotBottom}"/>${starsSvg(daylight, from, until, x, 4, plotBottom * 0.7)}`;
+    const uvMax = Math.max(1, ...timeline.uv.map((u) => u.uv));
+    const layout = { x, h, plotBottom, barMax: plotH * 0.42, uvMax, timezone, hourPx: HOUR * scale };
     const { midnights, labels } = axisSvg(timeline, layout);
 
     const nowX = x(now);
@@ -290,16 +342,17 @@ export function createChart(el, { onSelect, onView }) {
 <defs>
 <linearGradient id="c-line" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="${f1(tempTop)}" y2="${f1(tempBottom)}">${stops}</linearGradient>
 <linearGradient id="c-area" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${tempColor(hi)}" stop-opacity=".2"/><stop offset="1" stop-color="${tempColor(lo)}" stop-opacity="0"/></linearGradient>
+<linearGradient id="c-sky" gradientUnits="userSpaceOnUse" x1="0" x2="${f1(x(until))}" y1="0" y2="0">${skyStops(daylight, from, until, x)}</linearGradient>
 <clipPath id="c-clip"><rect x="0" y="0" width="${f1(x(until))}" height="${plotBottom}"/></clipPath>
 </defs>
 <g class="c-scroll">
-${shade}${midnights}${barsSvg(timeline, layout)}
+${sky}${midnights}${barsSvg(timeline, layout)}
 <g clip-path="url(#c-clip)"><g class="c-curve">
 <path d="${area}" fill="url(#c-area)"/>
 <path class="c-temp" d="${line}" stroke="url(#c-line)" vector-effect="non-scaling-stroke"/>
 </g></g>
 <rect class="c-past" x="0" y="0" width="${f1(nowX)}" height="${h}"/>
-${uvLabels(timeline.uv, days, layout)}${probabilityLabels(spells, layout)}${extremesSvg(points, xy, days)}${labels}
+${uvLabels(timeline.uv, days, layout)}${amountLabels(spells, layout)}${extremesSvg(points, xy, days)}${labels}
 <line class="c-now" x1="${f1(nowX)}" x2="${f1(nowX)}" y1="${plotTop - 2}" y2="${plotBottom}"/>
 <text class="c-label c-now-label" x="${f1(nowX)}" y="${h - 4}" text-anchor="middle">jetzt</text>
 <g class="c-marker" hidden><line y1="0" y2="${plotBottom}"/><circle r="4.5"/></g>
