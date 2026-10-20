@@ -70,17 +70,18 @@ function nights(daylight, from, until) {
   return result;
 }
 
-function skyStops(daylight, from, until, x) {
+// Stops of a left-to-right gradient that is `night` at night and `day` by day.
+function skyStops(daylight, from, until, x, night, day) {
   const width = x(until);
   const stop = (t, cls) =>
     `<stop offset="${Math.min(1, Math.max(0, x(t) / width)).toFixed(4)}" class="${cls}"/>`;
-  let stops = stop(from, 'c-sky-night');
+  let stops = stop(from, night);
   for (const [rise, set] of daylight) {
     if (set + TWILIGHT <= from || rise - TWILIGHT >= until) continue;
-    stops += stop(rise - TWILIGHT, 'c-sky-night') + stop(rise + TWILIGHT, 'c-sky-day');
-    stops += stop(set - TWILIGHT, 'c-sky-day') + stop(set + TWILIGHT, 'c-sky-night');
+    stops += stop(rise - TWILIGHT, night) + stop(rise + TWILIGHT, day);
+    stops += stop(set - TWILIGHT, day) + stop(set + TWILIGHT, night);
   }
-  return stops + stop(until, 'c-sky-night');
+  return stops + stop(until, night);
 }
 
 // Scattered by a fixed hash of the time, so the stars stay put across redraws.
@@ -332,7 +333,10 @@ export function createChart(el, { onSelect, onView }) {
     const stops = [0, 0.25, 0.5, 0.75, 1]
       .map((o) => `<stop offset="${o}" stop-color="${tempColor(hi - o * (hi - lo))}"/>`)
       .join('');
-    const sky = `<rect fill="url(#c-sky)" x="0" y="0" width="${f1(x(until))}" height="${plotBottom}"/>${starsSvg(daylight, from, until, x, 4, plotBottom * 0.7)}`;
+    // Night: a dark veil. Day: a blue sky, deeper on top, shown through a mask
+    // with the same fades.
+    const box = `x="0" y="0" width="${f1(x(until))}" height="${plotBottom}"`;
+    const sky = `<rect fill="url(#c-night)" ${box}/><rect fill="url(#c-day)" mask="url(#c-daylight)" ${box}/>${starsSvg(daylight, from, until, x, 4, plotBottom * 0.7)}`;
     const uvMax = Math.max(1, ...timeline.uv.map((u) => u.uv));
     const layout = { x, h, plotBottom, barMax: plotH * 0.42, uvMax, timezone, hourPx: HOUR * scale };
     const { midnights, labels } = axisSvg(timeline, layout);
@@ -342,7 +346,10 @@ export function createChart(el, { onSelect, onView }) {
 <defs>
 <linearGradient id="c-line" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="${f1(tempTop)}" y2="${f1(tempBottom)}">${stops}</linearGradient>
 <linearGradient id="c-area" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${tempColor(hi)}" stop-opacity=".2"/><stop offset="1" stop-color="${tempColor(lo)}" stop-opacity="0"/></linearGradient>
-<linearGradient id="c-sky" gradientUnits="userSpaceOnUse" x1="0" x2="${f1(x(until))}" y1="0" y2="0">${skyStops(daylight, from, until, x)}</linearGradient>
+<linearGradient id="c-night" gradientUnits="userSpaceOnUse" x1="0" x2="${f1(x(until))}" y1="0" y2="0">${skyStops(daylight, from, until, x, 'c-sky-night', 'c-sky-none')}</linearGradient>
+<linearGradient id="c-daylight-fade" gradientUnits="userSpaceOnUse" x1="0" x2="${f1(x(until))}" y1="0" y2="0">${skyStops(daylight, from, until, x, 'c-mask-off', 'c-mask-on')}</linearGradient>
+<mask id="c-daylight" maskUnits="userSpaceOnUse" ${box}><rect fill="url(#c-daylight-fade)" ${box}/></mask>
+<linearGradient id="c-day" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="0" y2="${plotBottom}"><stop offset="0" class="c-sky-top"/><stop offset="1" class="c-sky-horizon"/></linearGradient>
 <clipPath id="c-clip"><rect x="0" y="0" width="${f1(x(until))}" height="${plotBottom}"/></clipPath>
 </defs>
 <g class="c-scroll">

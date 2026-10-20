@@ -329,12 +329,28 @@ h2 {
     sans-serif;
 }
 
-.c-sky-day {
-  stop-color: rgb(186 214 255 / 0.22);
-}
-
 .c-sky-night {
   stop-color: rgb(0 0 8 / 0.55);
+}
+
+.c-sky-none {
+  stop-color: rgb(0 0 8 / 0);
+}
+
+.c-sky-top {
+  stop-color: rgb(84 166 246 / 0.72);
+}
+
+.c-sky-horizon {
+  stop-color: rgb(168 218 252 / 0.62);
+}
+
+.c-mask-on {
+  stop-color: #fff;
+}
+
+.c-mask-off {
+  stop-color: #000;
 }
 
 .c-star {

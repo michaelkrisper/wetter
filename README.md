@@ -23,7 +23,7 @@ together from several weather services into one continuous forecast.
 - **One chart for the whole week.** Temperature curve with each day's high
   and low over precipitation bars (height = amount, opacity = probability,
   each spell labelled with its amount) and UV bars with the daily maximum,
-  on a sky that is light by day and dark with stars by night, with
+  on a sky that is light blue by day and dark with stars by night, with
   sunrise/sunset and moonrise/moonset marked at their time. 12 hours wide
   with hourly labels; drag sideways to scroll, tap a point for its values,
   tap a day in the list to see its 00-24 h.
