@@ -171,7 +171,7 @@ describe('app in a browser', { skip: !chrome && 'no Chrome found', timeout: 60_0
       mobile: true,
     });
     await page('Page.navigate', { url: `${origin}/` });
-    await waitFor(`!document.body.classList.contains('is-empty')`);
+    await waitFor(`document.body && !document.body.classList.contains('is-empty')`);
   });
 
   after(async () => {
