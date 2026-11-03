@@ -1,6 +1,7 @@
 name: Deploy
 
-# Lints the app and publishes src/ to GitHub Pages on every push to main.
+# Lints and tests every push and pull request; pushes to main are then
+# published to GitHub Pages (src/) once the checks have passed.
 # There is no build step: the only change on the way out is stamping the
 # commit into the service worker, so each release gets a fresh app cache.
 

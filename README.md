@@ -4,10 +4,13 @@
 next 90 minutes, hourly for the next days, daily for the week, stitched
 together from several weather services into one continuous forecast.
 
-[**Open the app →**](https://michaelkrisper.github.io/wetter/)
-
 [![Deploy](https://github.com/michaelkrisper/wetter/actions/workflows/deploy.yml/badge.svg)](https://github.com/michaelkrisper/wetter/actions/workflows/deploy.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Live demo](https://img.shields.io/badge/demo-michaelkrisper.github.io%2Fwetter-2ea44f)](https://michaelkrisper.github.io/wetter/)
+
+**Live demo: [michaelkrisper.github.io/wetter](https://michaelkrisper.github.io/wetter/)**
+
+The user interface is in German.
 
 <p align="center">
   <img src="docs/screenshot-weather.webp" width="300" alt="Weather overview: current conditions, combined temperature, rain and UV chart, 7-day forecast">
@@ -91,12 +94,27 @@ There is no build step: `src/` is the app, served as-is.
 ```sh
 npm ci            # dev tools (Biome)
 npm run serve     # http://localhost:8080, gzip like GitHub Pages
-npm run check     # lint and format check
+npm test          # unit tests, plus the app in headless Chrome if installed
+npm run check     # what CI runs: lint, format check and tests
 npm run lint:fix  # format and fix
 ```
 
 The service worker is not registered on `localhost`, so a reload always shows
 the current files.
+
+### Tests
+
+Zero-dependency tests with Node's built-in runner (`node:test`) in `test/`:
+
+- `model.test.js`: the pure forecast model (outlook, rain spells, bars,
+  temperature blending)
+- `forecast.test.js`, `open-meteo.test.js`, `sources.test.js`: loading and
+  fallbacks, each source including the summer time change, INCA, geocoding
+  and the radar grid, with `fetch` mocked from fixtures
+- `basics.test.js`, `codes.test.js`: regions, formatting, colours, weather
+  codes, icons, reverse geocoding and storage
+- `app.test.js`: the whole app in headless Chrome with every service answered
+  from fixtures; skipped when no Chrome is found (set `CHROME` to its path)
 
 ### Project structure
 
@@ -129,15 +147,15 @@ the [Open-Meteo model](https://open-meteo.com/en/docs) and the nowcast order.
 
 ## Deployment
 
-Every push to `main` runs the checks and publishes `src/` to GitHub Pages via
-[GitHub Actions](.github/workflows/deploy.yml). The workflow stamps the commit
+Every push and pull request runs lint and tests; pushes to `main` then publish
+`src/` to GitHub Pages via [GitHub Actions](.github/workflows/deploy.yml), but
+only if the checks passed. The workflow stamps the commit
 hash into `sw.js`, so installed apps pick up the new version on their next
 start, and finishes with a smoke test against the live site.
 
 ## Roadmap
 
 - Polish the design further
-- Tests for the merging logic in `model.js` and an end-to-end check
 
 ## Credits
 
