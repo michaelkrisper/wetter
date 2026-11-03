@@ -5,6 +5,7 @@ next 90 minutes, hourly for the next days, daily for the week, stitched
 together from several weather services into one continuous forecast.
 
 [![Deploy](https://github.com/michaelkrisper/wetter/actions/workflows/deploy.yml/badge.svg)](https://github.com/michaelkrisper/wetter/actions/workflows/deploy.yml)
+[![Node.js](https://img.shields.io/badge/node-26-339933?logo=nodedotjs&logoColor=white)](.nvmrc)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Live demo](https://img.shields.io/badge/demo-michaelkrisper.github.io%2Fwetter-2ea44f)](https://michaelkrisper.github.io/wetter/)
 
@@ -92,7 +93,7 @@ app shows Graz.
 There is no build step: `src/` is the app, served as-is.
 
 ```sh
-npm ci            # dev tools (Biome)
+npm ci            # dev tools (Biome); Node.js 26, see .nvmrc
 npm run serve     # http://localhost:8080, gzip like GitHub Pages
 npm test          # unit tests, plus the app in headless Chrome if installed
 npm run check     # what CI runs: lint, format check and tests

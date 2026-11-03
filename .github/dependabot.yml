@@ -1,4 +1,6 @@
-# Major updates of actions and dev tools as grouped weekly pull requests.
+# Weekly updates of GitHub Actions and npm dev tools. Minor and patch updates
+# are grouped into one pull request per ecosystem; major updates arrive
+# separately. Green Dependabot PRs are merged by dependabot-automerge.yml.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -7,7 +9,7 @@ updates:
       interval: weekly
     groups:
       actions:
-        patterns: ['*']
+        update-types: [minor, patch]
 
   - package-ecosystem: npm
     directory: /
@@ -15,4 +17,4 @@ updates:
       interval: weekly
     groups:
       npm:
-        patterns: ['*']
+        update-types: [minor, patch]

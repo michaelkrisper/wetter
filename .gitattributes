@@ -1,0 +1,5 @@
+* text=auto eol=lf
+*.png binary
+*.webp binary
+src/vendor/** linguist-vendored
+src/js/borders.js linguist-generated
