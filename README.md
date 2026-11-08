@@ -5,6 +5,7 @@ next 90 minutes, hourly for the next days, daily for the week, stitched
 together from several weather services into one continuous forecast.
 
 [![Deploy](https://github.com/michaelkrisper/wetter/actions/workflows/deploy.yml/badge.svg)](https://github.com/michaelkrisper/wetter/actions/workflows/deploy.yml)
+[![Version](https://img.shields.io/github/v/tag/michaelkrisper/wetter?sort=semver&label=version)](https://github.com/michaelkrisper/wetter/releases)
 [![Node.js](https://img.shields.io/badge/node-26-339933?logo=nodedotjs&logoColor=white)](.nvmrc)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Live demo](https://img.shields.io/badge/demo-michaelkrisper.github.io%2Fwetter-2ea44f)](https://michaelkrisper.github.io/wetter/)
@@ -154,6 +155,11 @@ only if the checks passed. The workflow stamps the commit
 hash into `sw.js`, so installed apps pick up the new version on their next
 start, and finishes with a smoke test against the live site.
 
+Every merge to `main` is tagged with the next patch version, and only tagged
+commits are deployed; bundled releases with release notes come from the
+Release workflow (see [CONTRIBUTING](CONTRIBUTING.md#versions-and-releases)).
+[CHANGELOG.md](CHANGELOG.md) covers the versions up to 1.4.4.
+
 ## Roadmap
 
 - Polish the design further
@@ -172,6 +178,10 @@ start, and finishes with a smoke test against the live site.
   [ODbL](https://www.openstreetmap.org/copyright)
 - [Natural Earth](https://www.naturalearthdata.com): country borders, public domain
 - [jsfive](https://github.com/usnistgov/jsfive): HDF5 reader, public domain
+
+## Contributing
+
+Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
