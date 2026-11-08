@@ -1,6 +1,8 @@
 // App shell cache. The deploy workflow replaces __VERSION__ with the commit,
 // so every release installs a fresh cache; weather data is never cached here
-// (the app keeps the last forecast in localStorage instead).
+// (the app keeps the last forecast in localStorage instead). Other apps share
+// the origin (michaelkrisper.github.io) and with it the cache storage, so only
+// this app's old caches are removed.
 
 const VERSION = '__VERSION__';
 const CACHE = `wetter-${VERSION}`;
@@ -50,7 +52,11 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))
+      .then((keys) =>
+        Promise.all(
+          keys.filter((key) => key.startsWith('wetter-') && key !== CACHE).map((key) => caches.delete(key)),
+        ),
+      )
       .then(() => self.clients.claim()),
   );
 });
