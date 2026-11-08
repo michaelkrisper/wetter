@@ -83,6 +83,7 @@ export function week(now, tz = TZ) {
       prob: rain?.prob ?? DRY_PROB,
       code: rain ? 61 : 1,
       wind: 10,
+      cloud: rain ? 100 : 30,
       uv: uvAt(time, tz),
       isDay: hour >= 7 && hour < 18,
     });
@@ -131,6 +132,7 @@ export function openMeteoResponse({ now = Date.now(), model = null, tz = TZ } = 
     precipitation_probability: hours.map((h) => h.prob),
     weather_code: hours.map((h) => h.code),
     wind_speed_10m: hours.map((h) => h.wind),
+    cloud_cover: hours.map((h) => h.cloud),
     uv_index: hours.map((h) => h.uv),
     is_day: hours.map((h) => (h.isDay ? 1 : 0)),
   });

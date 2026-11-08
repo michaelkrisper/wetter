@@ -14,6 +14,7 @@ const HOURLY = [
   'precipitation_probability',
   'weather_code',
   'wind_speed_10m',
+  'cloud_cover',
   'uv_index',
   'is_day',
 ];
@@ -37,6 +38,7 @@ const REGIONAL = new Set([
   'precipitation',
   'weather_code',
   'wind_speed_10m',
+  'cloud_cover',
   'temperature_2m_max',
   'temperature_2m_min',
   'precipitation_sum',
@@ -116,6 +118,7 @@ function normalize(data, model) {
     prob: hourlyColumns.precipitation_probability[i],
     code: hourlyColumns.weather_code[i],
     wind: hourlyColumns.wind_speed_10m[i],
+    cloud: hourlyColumns.cloud_cover[i],
     uv: hourlyColumns.uv_index[i],
     isDay: hourlyColumns.is_day[i] === 1,
   }));

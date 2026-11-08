@@ -16,5 +16,9 @@ export const DAYS = 7;
 export const REFRESH_MS = 10 * 60_000;
 export const REQUEST_TIMEOUT_MS = 8000;
 
+// Mean wind speed (km/h) from which the chart highlights it: fresh breeze
+// (Beaufort 5) and strong wind (Beaufort 7).
+export const WIND_KMH = { fresh: 29, strong: 50 };
+
 // Precipitation rate (mm/h) below which a nowcast step counts as dry.
 export const WET_THRESHOLD = 0.1;
