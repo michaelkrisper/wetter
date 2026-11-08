@@ -3,7 +3,10 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+This file ends with 1.4.4. Later changes are listed in the
+[GitHub releases](https://github.com/michaelkrisper/wetter/releases).
+
+## [1.4.4] - 2026-11-08
 
 ### Added
 
