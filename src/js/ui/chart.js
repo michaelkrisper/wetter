@@ -14,8 +14,9 @@ const HOUR = 3_600_000;
 const SPAN = { now: 12 * HOUR, day: 24 * HOUR };
 const LEAD = HOUR; // the default view starts one hour before now
 const PAD = { top: 18, bottom: 36 };
-// Cloud band just below the wind row.
-const CLOUD_TOP = 14;
+// Along the top: the wind row, the UV suns below it, then the cloud band.
+const SUN_Y = 22;
+const CLOUD_TOP = 30;
 const CLOUD_H = 30;
 // Rain starts at the base of the puffs.
 const RAIN_TOP = CLOUD_TOP + CLOUD_H * 0.8;
@@ -277,22 +278,23 @@ const EVENT_ICONS = {
 // Unlikely rain fades out quickly: 10 % is just visible, 50 % still pale.
 const rainOpacity = (prob) => (prob == null ? 1 : 0.07 + 0.93 * (prob / 100) ** 2);
 
-// The UV index as a sun per hour on top of the cloud band, by WHO danger level:
-// none while low (below 3), small from moderate (3), medium from high (6), large
-// from very high (8). Shrunk where hours get narrow (a whole day on screen).
+// The UV index (rounded, as it is quoted) as a sun per hour above the clouds,
+// by WHO danger level: small and yellow while low (1-2), medium and orange from
+// moderate (3), large and red from high (6). Capped where hours get narrow (a
+// whole day on screen), so only the large ones may touch.
 const UV_SUNS = [
-  { from: 8, r: 5 },
-  { from: 6, r: 3.6 },
-  { from: 3, r: 2.4 },
+  { from: 6, r: 4.8 },
+  { from: 3, r: 3.7 },
+  { from: 1, r: 2.7 },
 ];
-const SUN_Y = CLOUD_TOP + 9;
 
 function uvSunsSvg(uv, x, hourPx) {
-  const k = Math.min(1, hourPx / 25);
+  const cap = hourPx * 0.27;
   const paths = UV_SUNS.map(() => '');
   for (const u of uv) {
-    const level = UV_SUNS.findIndex(({ from }) => u.uv >= from);
-    if (level >= 0) paths[level] += sunPath((x(u.start) + x(u.end)) / 2, SUN_Y, UV_SUNS[level].r * k);
+    const level = UV_SUNS.findIndex(({ from }) => Math.round(u.uv) >= from);
+    if (level >= 0)
+      paths[level] += sunPath((x(u.start) + x(u.end)) / 2, SUN_Y, Math.min(UV_SUNS[level].r, cap));
   }
   return paths.map((d, level) => (d ? `<path class="c-uv-sun c-uv-sun-${level}" d="${d}"/>` : '')).join('');
 }
@@ -495,8 +497,8 @@ export function createChart(el, { onSelect, onView }) {
     const sky = `<rect fill="url(#c-night)" ${box}/><rect fill="url(#c-day)" mask="url(#c-daylight)" ${box}/>${starsSvg(daylight, from, until, x, 4, plotBottom * 0.7, timeline.sky)}`;
     // Without a card around it the sky fades in at the top instead of ending in
     // an edge: page colour laid over it, cheaper to scroll than a mask. Only behind
-    // the wind row, so the cloud band below shows the full sky.
-    const fadeH = f1(Math.min(plotBottom, CLOUD_TOP + 6));
+    // the wind row, so the suns and clouds below show the full sky.
+    const fadeH = f1(Math.min(plotBottom, SUN_Y - 2));
     const skyFade = `<linearGradient id="c-sky-fade" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="0" y2="${fadeH}"><stop offset="0" class="c-page" stop-opacity="1"/><stop offset=".4" class="c-page" stop-opacity=".55"/><stop offset="1" class="c-page" stop-opacity="0"/></linearGradient>`;
     const layout = { x, h, plotBottom, timezone, hourPx: HOUR * scale };
     const { midnights, labels } = axisSvg(timeline, layout);

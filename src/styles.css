@@ -544,10 +544,14 @@ h2 {
 }
 
 .c-uv-sun-0 {
+  fill: #ef4444;
+  stroke: #ef4444;
   stroke-width: 1.5;
 }
 
 .c-uv-sun-1 {
+  fill: #fb923c;
+  stroke: #fb923c;
   stroke-width: 1.2;
 }
 
