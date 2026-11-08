@@ -349,6 +349,33 @@ h2 {
   stop-color: #fff;
 }
 
+.c-mask-half {
+  stop-color: #777;
+}
+
+.c-cloud {
+  stop-color: rgb(148 163 184);
+}
+
+.c-wind {
+  fill: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.c-wind-unit {
+  font-weight: 400;
+  fill: var(--faint);
+}
+
+.c-wind.is-fresh {
+  fill: var(--text);
+}
+
+.c-wind.is-strong {
+  fill: var(--sun);
+}
+
 .c-mask-off {
   stop-color: #000;
 }

@@ -193,7 +193,7 @@ function temperaturePoints({ hourly, minutely, nowcast }, now, until, current, f
 }
 
 // The whole forecast as one timeline: temperature, precipitation and UV bars,
-// sun and moon events.
+// cloud cover and wind per hour, sun and moon events.
 function timeline(forecast, now, until, current, steps, from) {
   const { hourly, daily } = forecast;
   const points = temperaturePoints(forecast, now, until, current, from);
@@ -207,8 +207,13 @@ function timeline(forecast, now, until, current, steps, from) {
     .filter((h) => h.time >= from && h.time <= end && h.uv >= 0.5)
     .map((h) => ({ start: h.time - HOUR / 2, end: h.time + HOUR / 2, uv: h.uv }));
 
+  // Forecasts stored before cloud cover was fetched have none: null, drawn as clear.
+  const sky = hourly
+    .filter((h) => h.time >= from - HOUR && h.time <= end + HOUR)
+    .map((h) => ({ time: h.time, cloud: h.cloud ?? null, wind: h.wind ?? null }));
+
   const bars = precipitationBars(hourly, from, steps);
-  return { from, until: end, now, points, bars, spells: rainSpells(bars), uv, events };
+  return { from, until: end, now, points, bars, spells: rainSpells(bars), uv, sky, events };
 }
 
 export function snapshot(forecast, now = Date.now()) {

@@ -5,6 +5,7 @@
 // bottom. Drawn at the container's real pixel size; scrolling only moves a
 // transform, so it stays smooth.
 
+import { WIND_KMH } from '../config.js';
 import { rainScale, tempColor } from './colors.js';
 import { decimal, hour, temp, weekday } from './format.js';
 
@@ -84,8 +85,39 @@ function skyStops(daylight, from, until, x, night, day) {
   return stops + stop(until, night);
 }
 
+// Cloud cover as a grey veil over the sky, densest at the top: one stop per
+// hour, its opacity the cover.
+function cloudSvg(sky, until, x, box, plotBottom) {
+  const width = x(until);
+  const stops = sky
+    .filter((s) => s.cloud != null)
+    .map(
+      (s) =>
+        `<stop offset="${(x(s.time) / width).toFixed(4)}" class="c-cloud" stop-opacity="${((s.cloud / 100) * 0.42).toFixed(3)}"/>`,
+    )
+    .join('');
+  if (!stops) return { defs: '', svg: '' };
+  const defs = `<linearGradient id="c-clouds" gradientUnits="userSpaceOnUse" x1="0" x2="${f1(width)}" y1="0" y2="0">${stops}</linearGradient>
+<linearGradient id="c-cloud-fade" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="0" y2="${plotBottom}"><stop offset="0" class="c-mask-on"/><stop offset="1" class="c-mask-half"/></linearGradient>
+<mask id="c-cloud-mask" maskUnits="userSpaceOnUse" ${box}><rect fill="url(#c-cloud-fade)" ${box}/></mask>`;
+  return { defs, svg: `<rect fill="url(#c-clouds)" mask="url(#c-cloud-mask)" ${box}/>` };
+}
+
+// Wind speed every 3 hours along the top, highlighted from a fresh breeze on.
+function windSvg(sky, x, timezone) {
+  let svg = '';
+  for (const { time, wind } of sky) {
+    const hh = Number(hour(time, timezone));
+    // Not at midnight, where the weekday label sits.
+    if (wind == null || hh % 3 !== 0 || hh === 0) continue;
+    const level = wind >= WIND_KMH.strong ? ' is-strong' : wind >= WIND_KMH.fresh ? ' is-fresh' : '';
+    svg += `<text class="c-wind${level}" x="${f1(x(time))}" y="11" text-anchor="middle">${Math.round(wind)}<tspan class="c-wind-unit"> km/h</tspan></text>`;
+  }
+  return svg;
+}
+
 // Scattered by a fixed hash of the time, so the stars stay put across redraws.
-function starsSvg(daylight, from, until, x, top, bottom) {
+function starsSvg(daylight, from, until, x, top, bottom, sky = []) {
   let svg = '';
   for (const [a, b] of nights(daylight, from, until)) {
     const start = a + TWILIGHT;
@@ -96,9 +128,16 @@ function starsSvg(daylight, from, until, x, top, bottom) {
       const r1 = hash(start + i * 7919);
       const r2 = hash(start + i * 104_729 + 1);
       const r3 = hash(start + i * 15_485_863 + 2);
-      const cx = x(start + r1 * (end - start));
+      const time = start + r1 * (end - start);
+      const cx = x(time);
+      // Clouds hide the stars: nearest hour's cover.
+      const cover = sky.reduce((a, b) => (Math.abs(b.time - time) < Math.abs(a.time - time) ? b : a), {
+        time: Number.POSITIVE_INFINITY,
+        cloud: null,
+      }).cloud;
+      const clear = 1 - ((cover ?? 0) / 100) * 0.9;
       const cy = top + r2 ** 1.6 * (bottom - top);
-      svg += `<circle class="c-star" cx="${f1(cx)}" cy="${f1(cy)}" r="${(0.5 + r3 * 0.7).toFixed(2)}" opacity="${(0.25 + r3 * 0.55).toFixed(2)}"/>`;
+      svg += `<circle class="c-star" cx="${f1(cx)}" cy="${f1(cy)}" r="${(0.5 + r3 * 0.7).toFixed(2)}" opacity="${((0.25 + r3 * 0.55) * clear).toFixed(2)}"/>`;
     }
   }
   return svg;
@@ -336,9 +375,10 @@ export function createChart(el, { onSelect, onView }) {
     // Night: a dark veil. Day: a blue sky, deeper on top, shown through a mask
     // with the same fades.
     const box = `x="0" y="0" width="${f1(x(until))}" height="${plotBottom}"`;
-    const sky = `<rect fill="url(#c-night)" ${box}/><rect fill="url(#c-day)" mask="url(#c-daylight)" ${box}/>${starsSvg(daylight, from, until, x, 4, plotBottom * 0.7)}`;
+    const clouds = cloudSvg(timeline.sky, until, x, box, plotBottom);
+    const sky = `<rect fill="url(#c-night)" ${box}/><rect fill="url(#c-day)" mask="url(#c-daylight)" ${box}/>${starsSvg(daylight, from, until, x, 4, plotBottom * 0.7, timeline.sky)}${clouds.svg}`;
     // Without a card around it the sky fades in at the top instead of ending in an edge.
-    const skyFade = `<linearGradient id="c-sky-fade" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="0" y2="${f1(Math.min(plotBottom, 28))}"><stop offset="0" class="c-mask-off"/><stop offset="1" class="c-mask-on"/></linearGradient><mask id="c-sky-mask" maskUnits="userSpaceOnUse" ${box}><rect fill="url(#c-sky-fade)" ${box}/></mask>`;
+    const skyFade = `<linearGradient id="c-sky-fade" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="0" y2="${f1(Math.min(plotBottom, 64))}"><stop offset="0" class="c-mask-off"/><stop offset=".4" class="c-mask-half"/><stop offset="1" class="c-mask-on"/></linearGradient><mask id="c-sky-mask" maskUnits="userSpaceOnUse" ${box}><rect fill="url(#c-sky-fade)" ${box}/></mask>`;
     const uvMax = Math.max(1, ...timeline.uv.map((u) => u.uv));
     const layout = { x, h, plotBottom, barMax: plotH * 0.42, uvMax, timezone, hourPx: HOUR * scale };
     const { midnights, labels } = axisSvg(timeline, layout);
@@ -353,6 +393,7 @@ export function createChart(el, { onSelect, onView }) {
 <mask id="c-daylight" maskUnits="userSpaceOnUse" ${box}><rect fill="url(#c-daylight-fade)" ${box}/></mask>
 <linearGradient id="c-day" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="0" y2="${plotBottom}"><stop offset="0" class="c-sky-top"/><stop offset="1" class="c-sky-horizon"/></linearGradient>
 ${skyFade}
+${clouds.defs}
 <clipPath id="c-clip"><rect x="0" y="0" width="${f1(x(until))}" height="${plotBottom}"/></clipPath>
 </defs>
 <g class="c-scroll">
@@ -362,7 +403,7 @@ ${skyFade}
 <path class="c-temp" d="${line}" stroke="url(#c-line)" vector-effect="non-scaling-stroke"/>
 </g></g>
 <rect class="c-past" x="0" y="0" width="${f1(nowX)}" height="${h}"/>
-${uvLabels(timeline.uv, days, layout)}${amountLabels(spells, layout)}${extremesSvg(points, xy, days)}${labels}
+${uvLabels(timeline.uv, days, layout)}${amountLabels(spells, layout)}${extremesSvg(points, xy, days)}${windSvg(timeline.sky, x, timezone)}${labels}
 <line class="c-now" x1="${f1(nowX)}" x2="${f1(nowX)}" y1="${plotTop - 2}" y2="${plotBottom}"/>
 <text class="c-label c-now-label" x="${f1(nowX)}" y="${h - 4}" text-anchor="middle">jetzt</text>
 <g class="c-marker" hidden><line y1="0" y2="${plotBottom}"/><circle r="4.5"/></g>
