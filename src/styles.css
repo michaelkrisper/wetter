@@ -353,8 +353,12 @@ h2 {
   stop-color: var(--bg);
 }
 
-.c-cloud {
-  stop-color: rgb(148 163 184);
+.c-puff-day {
+  stop-color: rgb(241 245 249);
+}
+
+.c-puff-night {
+  stop-color: rgb(100 116 139);
 }
 
 .c-wind {
