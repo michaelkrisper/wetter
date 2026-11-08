@@ -349,8 +349,8 @@ h2 {
   stop-color: #fff;
 }
 
-.c-mask-half {
-  stop-color: #777;
+.c-page {
+  stop-color: var(--bg);
 }
 
 .c-cloud {
