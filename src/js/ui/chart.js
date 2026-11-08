@@ -14,8 +14,8 @@ const SPAN = { now: 12 * HOUR, day: 24 * HOUR };
 const LEAD = HOUR; // the default view starts one hour before now
 const PAD = { top: 18, bottom: 36 };
 // Cloud band just below the wind row.
-const CLOUD_TOP = 15;
-const CLOUD_H = 14;
+const CLOUD_TOP = 14;
+const CLOUD_H = 30;
 // Hour labels every hour where they fit, every 3 hours otherwise.
 const HOURLY_LABEL_PX = 24;
 // The temperature axis fits what is on screen, but spans at least this many
@@ -88,28 +88,34 @@ function skyStops(daylight, from, until, x, night, day) {
   return stops + stop(until, night);
 }
 
-// Cloud cover as a grey band across the top of the sky, below the wind row: one
-// stop per hour, its opacity the cover. A veil over the whole chart only washed it
-// out. The lower edge fades through a few thinner strips; no mask, Safari repaints
-// masked content on every scroll frame.
-function cloudSvg(sky, until, x) {
-  const width = x(until);
-  const stops = sky
-    .filter((s) => s.cloud != null)
-    .map(
-      (s) =>
-        `<stop offset="${(x(s.time) / width).toFixed(4)}" class="c-cloud" stop-opacity="${((s.cloud / 100) * 0.75).toFixed(3)}"/>`,
-    )
-    .join('');
-  if (!stops) return { defs: '', svg: '' };
-  const defs = `<linearGradient id="c-clouds" gradientUnits="userSpaceOnUse" x1="0" x2="${f1(width)}" y1="0" y2="0">${stops}</linearGradient>`;
-  const strip = (y, height, opacity) =>
-    `<rect fill="url(#c-clouds)" opacity="${opacity}" x="0" y="${y}" width="${f1(width)}" height="${height}"/>`;
-  const svg =
-    strip(CLOUD_TOP, CLOUD_H, 1) +
-    strip(CLOUD_TOP + CLOUD_H, 3, 0.6) +
-    strip(CLOUD_TOP + CLOUD_H + 3, 3, 0.3);
-  return { defs, svg };
+// Cloud cover as puffs in a band across the top of the sky, below the wind row:
+// per hour more, bigger and denser puffs the more cover, so an overcast sky closes
+// into one layer and a clear one leaves the blue or the stars. A veil over the
+// whole chart only washed it out. Soft edges come from a radial gradient, not a
+// blur or mask: Safari repaints those on every scroll frame. Scattered by a
+// fixed hash of the time, so the clouds stay put across redraws.
+function cloudSvg(sky, daylight, x, hourPx) {
+  const isDay = (t) => daylight.some(([rise, set]) => t >= rise && t < set);
+  let svg = '';
+  for (const { time, cloud } of sky) {
+    if (!cloud) continue;
+    const c = cloud / 100;
+    const count = Math.max(1, Math.round(c * 4));
+    const cls = isDay(time) ? 'c-puff-day' : 'c-puff-night';
+    for (let i = 0; i < count; i++) {
+      const r1 = hash(time / HOUR + i * 0.37);
+      const r2 = hash(time / HOUR + i * 0.71 + 0.5);
+      const r3 = hash(time / HOUR + i * 0.13 + 0.25);
+      const ry = CLOUD_H * (0.25 + 0.3 * c) * (0.7 + 0.6 * r3);
+      const cx = x(time) + (r1 - 0.5) * hourPx * 1.2;
+      const cy = CLOUD_TOP + CLOUD_H * (0.35 + 0.3 * r2);
+      svg += `<ellipse fill="url(#${cls})" cx="${f1(cx)}" cy="${f1(cy)}" rx="${f1(ry * 1.6)}" ry="${f1(ry)}" opacity="${(0.45 + 0.55 * c).toFixed(2)}"/>`;
+    }
+  }
+  if (!svg) return { defs: '', svg: '' };
+  const puff = (id) =>
+    `<radialGradient id="${id}"><stop offset="0" class="${id}" stop-opacity=".95"/><stop offset=".55" class="${id}" stop-opacity=".7"/><stop offset="1" class="${id}" stop-opacity="0"/></radialGradient>`;
+  return { defs: puff('c-puff-day') + puff('c-puff-night'), svg };
 }
 
 // Wind speed every 3 hours along the top, highlighted from a fresh breeze on.
@@ -384,11 +390,12 @@ export function createChart(el, { onSelect, onView }) {
     // Night: a dark veil. Day: a blue sky, deeper on top, shown through a mask
     // with the same fades.
     const box = `x="0" y="0" width="${f1(x(until))}" height="${plotBottom}"`;
-    const clouds = cloudSvg(timeline.sky, until, x);
+    const clouds = cloudSvg(timeline.sky, daylight, x, HOUR * scale);
     const sky = `<rect fill="url(#c-night)" ${box}/><rect fill="url(#c-day)" mask="url(#c-daylight)" ${box}/>${starsSvg(daylight, from, until, x, 4, plotBottom * 0.7, timeline.sky)}`;
     // Without a card around it the sky fades in at the top instead of ending in
-    // an edge: page colour laid over it, cheaper to scroll than a mask.
-    const fadeH = f1(Math.min(plotBottom, 64));
+    // an edge: page colour laid over it, cheaper to scroll than a mask. Only behind
+    // the wind row, so the cloud band below shows the full sky.
+    const fadeH = f1(Math.min(plotBottom, CLOUD_TOP + 6));
     const skyFade = `<linearGradient id="c-sky-fade" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="0" y2="${fadeH}"><stop offset="0" class="c-page" stop-opacity="1"/><stop offset=".4" class="c-page" stop-opacity=".55"/><stop offset="1" class="c-page" stop-opacity="0"/></linearGradient>`;
     const uvMax = Math.max(1, ...timeline.uv.map((u) => u.uv));
     const layout = { x, h, plotBottom, barMax: plotH * 0.42, uvMax, timezone, hourPx: HOUR * scale };
