@@ -357,8 +357,36 @@ h2 {
   stop-color: rgb(241 245 249);
 }
 
-.c-puff-night {
+.c-puff-day-night {
   stop-color: rgb(100 116 139);
+}
+
+.c-puff-rain {
+  stop-color: rgb(100 116 139);
+}
+
+.c-puff-rain-night {
+  stop-color: rgb(71 85 105);
+}
+
+.c-drop,
+.c-flake {
+  fill: none;
+  stroke: var(--rain);
+  stroke-linecap: round;
+  stroke-width: 1.5;
+}
+
+.c-flake {
+  stroke: #e2e8f0;
+  stroke-width: 2.4;
+}
+
+.c-gust {
+  fill: none;
+  stroke: rgb(255 255 255 / 0.45);
+  stroke-linecap: round;
+  stroke-width: 1;
 }
 
 .c-wind {
