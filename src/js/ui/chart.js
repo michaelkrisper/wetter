@@ -85,22 +85,20 @@ function skyStops(daylight, from, until, x, night, day) {
   return stops + stop(until, night);
 }
 
-// Cloud cover as a grey veil over the sky, densest at the top: one stop per
-// hour, its opacity the cover.
-function cloudSvg(sky, until, x, box, plotBottom) {
+// Cloud cover as a grey veil over the sky: one stop per hour, its opacity the
+// cover. No mask: Safari repaints masked content on every scroll frame.
+function cloudSvg(sky, until, x, box) {
   const width = x(until);
   const stops = sky
     .filter((s) => s.cloud != null)
     .map(
       (s) =>
-        `<stop offset="${(x(s.time) / width).toFixed(4)}" class="c-cloud" stop-opacity="${((s.cloud / 100) * 0.42).toFixed(3)}"/>`,
+        `<stop offset="${(x(s.time) / width).toFixed(4)}" class="c-cloud" stop-opacity="${((s.cloud / 100) * 0.32).toFixed(3)}"/>`,
     )
     .join('');
   if (!stops) return { defs: '', svg: '' };
-  const defs = `<linearGradient id="c-clouds" gradientUnits="userSpaceOnUse" x1="0" x2="${f1(width)}" y1="0" y2="0">${stops}</linearGradient>
-<linearGradient id="c-cloud-fade" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="0" y2="${plotBottom}"><stop offset="0" class="c-mask-on"/><stop offset="1" class="c-mask-half"/></linearGradient>
-<mask id="c-cloud-mask" maskUnits="userSpaceOnUse" ${box}><rect fill="url(#c-cloud-fade)" ${box}/></mask>`;
-  return { defs, svg: `<rect fill="url(#c-clouds)" mask="url(#c-cloud-mask)" ${box}/>` };
+  const defs = `<linearGradient id="c-clouds" gradientUnits="userSpaceOnUse" x1="0" x2="${f1(width)}" y1="0" y2="0">${stops}</linearGradient>`;
+  return { defs, svg: `<rect fill="url(#c-clouds)" ${box}/>` };
 }
 
 // Wind speed every 3 hours along the top, highlighted from a fresh breeze on.
@@ -375,10 +373,12 @@ export function createChart(el, { onSelect, onView }) {
     // Night: a dark veil. Day: a blue sky, deeper on top, shown through a mask
     // with the same fades.
     const box = `x="0" y="0" width="${f1(x(until))}" height="${plotBottom}"`;
-    const clouds = cloudSvg(timeline.sky, until, x, box, plotBottom);
+    const clouds = cloudSvg(timeline.sky, until, x, box);
     const sky = `<rect fill="url(#c-night)" ${box}/><rect fill="url(#c-day)" mask="url(#c-daylight)" ${box}/>${starsSvg(daylight, from, until, x, 4, plotBottom * 0.7, timeline.sky)}${clouds.svg}`;
-    // Without a card around it the sky fades in at the top instead of ending in an edge.
-    const skyFade = `<linearGradient id="c-sky-fade" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="0" y2="${f1(Math.min(plotBottom, 64))}"><stop offset="0" class="c-mask-off"/><stop offset=".4" class="c-mask-half"/><stop offset="1" class="c-mask-on"/></linearGradient><mask id="c-sky-mask" maskUnits="userSpaceOnUse" ${box}><rect fill="url(#c-sky-fade)" ${box}/></mask>`;
+    // Without a card around it the sky fades in at the top instead of ending in
+    // an edge: page colour laid over it, cheaper to scroll than a mask.
+    const fadeH = f1(Math.min(plotBottom, 64));
+    const skyFade = `<linearGradient id="c-sky-fade" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="0" y2="${fadeH}"><stop offset="0" class="c-page" stop-opacity="1"/><stop offset=".4" class="c-page" stop-opacity=".55"/><stop offset="1" class="c-page" stop-opacity="0"/></linearGradient>`;
     const uvMax = Math.max(1, ...timeline.uv.map((u) => u.uv));
     const layout = { x, h, plotBottom, barMax: plotH * 0.42, uvMax, timezone, hourPx: HOUR * scale };
     const { midnights, labels } = axisSvg(timeline, layout);
@@ -397,7 +397,7 @@ ${clouds.defs}
 <clipPath id="c-clip"><rect x="0" y="0" width="${f1(x(until))}" height="${plotBottom}"/></clipPath>
 </defs>
 <g class="c-scroll">
-<g mask="url(#c-sky-mask)">${sky}</g>${midnights}${barsSvg(timeline, layout)}
+${sky}<rect fill="url(#c-sky-fade)" x="0" y="0" width="${f1(x(until))}" height="${fadeH}"/>${midnights}${barsSvg(timeline, layout)}
 <g clip-path="url(#c-clip)"><g class="c-curve">
 <path d="${area}" fill="url(#c-area)"/>
 <path class="c-temp" d="${line}" stroke="url(#c-line)" vector-effect="non-scaling-stroke"/>
