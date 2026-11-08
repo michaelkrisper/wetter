@@ -13,6 +13,9 @@ const HOUR = 3_600_000;
 const SPAN = { now: 12 * HOUR, day: 24 * HOUR };
 const LEAD = HOUR; // the default view starts one hour before now
 const PAD = { top: 18, bottom: 36 };
+// Cloud band just below the wind row.
+const CLOUD_TOP = 15;
+const CLOUD_H = 14;
 // Hour labels every hour where they fit, every 3 hours otherwise.
 const HOURLY_LABEL_PX = 24;
 // The temperature axis fits what is on screen, but spans at least this many
@@ -85,20 +88,28 @@ function skyStops(daylight, from, until, x, night, day) {
   return stops + stop(until, night);
 }
 
-// Cloud cover as a grey veil over the sky: one stop per hour, its opacity the
-// cover. No mask: Safari repaints masked content on every scroll frame.
-function cloudSvg(sky, until, x, box) {
+// Cloud cover as a grey band across the top of the sky, below the wind row: one
+// stop per hour, its opacity the cover. A veil over the whole chart only washed it
+// out. The lower edge fades through a few thinner strips; no mask, Safari repaints
+// masked content on every scroll frame.
+function cloudSvg(sky, until, x) {
   const width = x(until);
   const stops = sky
     .filter((s) => s.cloud != null)
     .map(
       (s) =>
-        `<stop offset="${(x(s.time) / width).toFixed(4)}" class="c-cloud" stop-opacity="${((s.cloud / 100) * 0.32).toFixed(3)}"/>`,
+        `<stop offset="${(x(s.time) / width).toFixed(4)}" class="c-cloud" stop-opacity="${((s.cloud / 100) * 0.75).toFixed(3)}"/>`,
     )
     .join('');
   if (!stops) return { defs: '', svg: '' };
   const defs = `<linearGradient id="c-clouds" gradientUnits="userSpaceOnUse" x1="0" x2="${f1(width)}" y1="0" y2="0">${stops}</linearGradient>`;
-  return { defs, svg: `<rect fill="url(#c-clouds)" ${box}/>` };
+  const strip = (y, height, opacity) =>
+    `<rect fill="url(#c-clouds)" opacity="${opacity}" x="0" y="${y}" width="${f1(width)}" height="${height}"/>`;
+  const svg =
+    strip(CLOUD_TOP, CLOUD_H, 1) +
+    strip(CLOUD_TOP + CLOUD_H, 3, 0.6) +
+    strip(CLOUD_TOP + CLOUD_H + 3, 3, 0.3);
+  return { defs, svg };
 }
 
 // Wind speed every 3 hours along the top, highlighted from a fresh breeze on.
@@ -373,8 +384,8 @@ export function createChart(el, { onSelect, onView }) {
     // Night: a dark veil. Day: a blue sky, deeper on top, shown through a mask
     // with the same fades.
     const box = `x="0" y="0" width="${f1(x(until))}" height="${plotBottom}"`;
-    const clouds = cloudSvg(timeline.sky, until, x, box);
-    const sky = `<rect fill="url(#c-night)" ${box}/><rect fill="url(#c-day)" mask="url(#c-daylight)" ${box}/>${starsSvg(daylight, from, until, x, 4, plotBottom * 0.7, timeline.sky)}${clouds.svg}`;
+    const clouds = cloudSvg(timeline.sky, until, x);
+    const sky = `<rect fill="url(#c-night)" ${box}/><rect fill="url(#c-day)" mask="url(#c-daylight)" ${box}/>${starsSvg(daylight, from, until, x, 4, plotBottom * 0.7, timeline.sky)}`;
     // Without a card around it the sky fades in at the top instead of ending in
     // an edge: page colour laid over it, cheaper to scroll than a mask.
     const fadeH = f1(Math.min(plotBottom, 64));
@@ -397,7 +408,7 @@ ${clouds.defs}
 <clipPath id="c-clip"><rect x="0" y="0" width="${f1(x(until))}" height="${plotBottom}"/></clipPath>
 </defs>
 <g class="c-scroll">
-${sky}<rect fill="url(#c-sky-fade)" x="0" y="0" width="${f1(x(until))}" height="${fadeH}"/>${midnights}${barsSvg(timeline, layout)}
+${sky}<rect fill="url(#c-sky-fade)" x="0" y="0" width="${f1(x(until))}" height="${fadeH}"/>${clouds.svg}${midnights}${barsSvg(timeline, layout)}
 <g clip-path="url(#c-clip)"><g class="c-curve">
 <path d="${area}" fill="url(#c-area)"/>
 <path class="c-temp" d="${line}" stroke="url(#c-line)" vector-effect="non-scaling-stroke"/>
