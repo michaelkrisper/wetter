@@ -14,14 +14,14 @@
   --moon: #c7d2fe;
   --cloud: #d4d4d8;
 
-  --glow-sun: rgb(251 191 36 / 0.2);
-  --glow-night: rgb(99 102 241 / 0.2);
-  --glow-cloud: rgb(148 163 184 / 0.16);
-  --glow-night-cloud: rgb(71 85 105 / 0.24);
-  --glow-rain: rgb(56 189 248 / 0.2);
-  --glow-snow: rgb(226 232 240 / 0.16);
-  --glow-fog: rgb(161 161 170 / 0.14);
-  --glow-storm: rgb(167 139 250 / 0.24);
+  --glow-sun: rgb(251 191 36 / 0.32);
+  --glow-night: rgb(99 102 241 / 0.32);
+  --glow-cloud: rgb(148 163 184 / 0.26);
+  --glow-night-cloud: rgb(71 85 105 / 0.38);
+  --glow-rain: rgb(56 189 248 / 0.32);
+  --glow-snow: rgb(226 232 240 / 0.26);
+  --glow-fog: rgb(161 161 170 / 0.22);
+  --glow-storm: rgb(167 139 250 / 0.38);
   --glow: var(--glow-cloud);
 
   --gap: 10px;
@@ -73,7 +73,10 @@ body::before {
   content: '';
   position: fixed;
   inset: 0;
-  background: radial-gradient(110% 55% at 18% -8%, var(--glow), transparent 72%);
+  background:
+    radial-gradient(110% 55% at 18% -8%, var(--glow), transparent 72%),
+    radial-gradient(90% 40% at 100% 105%, var(--glow), transparent 70%);
+  opacity: 0.9;
   pointer-events: none;
 }
 
@@ -199,7 +202,7 @@ h2 {
 .hero-main {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
 }
 
 .hero-temp {
@@ -213,33 +216,30 @@ h2 {
 
 .hero-side {
   display: grid;
-  gap: 3px;
+  flex: 1;
   min-width: 0;
 }
 
 .hero-cond {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  font-size: 22px;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
   font-weight: 500;
   line-height: 1.15;
 }
 
 .hero-cond .wx {
   flex: none;
-  font-size: 52px;
+  font-size: 44px;
 }
 
 /* Cards */
 
 .card {
-  --icon-bg: var(--card);
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 12px 14px;
+  /* Sections sit on the page itself: halos and masks take the page colour. */
+  --card: var(--bg);
+  --icon-bg: var(--bg);
 }
 
 .card-head {
@@ -330,7 +330,7 @@ h2 {
 }
 
 .c-sky-night {
-  stop-color: rgb(0 0 8 / 0.55);
+  stop-color: rgb(14 20 46 / 0.6);
 }
 
 .c-sky-none {
@@ -409,6 +409,7 @@ h2 {
 }
 
 .c-ev {
+  opacity: 0.75;
   fill: none;
   stroke-width: 1.4;
   stroke-linecap: round;
@@ -465,7 +466,7 @@ h2 {
 /* 7 days */
 
 .days {
-  padding: 4px 14px;
+  padding: 0;
 }
 
 #days {
@@ -476,7 +477,7 @@ h2 {
 
 #days button {
   display: grid;
-  grid-template-columns: 3.5em 1.6em 2.9em 3.6em 2.1em minmax(2em, 1fr) 2.1em;
+  grid-template-columns: 3.5em 1.6em 3.4em 2.1em minmax(2em, 1fr) 2.1em;
   align-items: center;
   column-gap: 6px;
   width: calc(100% + 16px);
@@ -490,10 +491,6 @@ h2 {
 
 #days button.is-active {
   background: rgb(52 211 153 / 0.12);
-}
-
-#days li + li {
-  border-top: 1px solid var(--border);
 }
 
 .d-name {
@@ -512,18 +509,17 @@ h2 {
   font-size: 22px;
 }
 
-.d-rain,
-.d-mm {
-  font-size: 12px;
+.d-rain {
+  display: grid;
+  font-size: 11px;
+  line-height: 1.1;
+  color: var(--rain);
   text-align: right;
   white-space: nowrap;
 }
 
-.d-rain {
-  color: var(--rain);
-}
-
-.d-mm {
+.d-rain small {
+  font-size: 10px;
   color: var(--faint);
 }
 
@@ -562,8 +558,6 @@ h2 {
 .tabs {
   display: flex;
   justify-content: center;
-  border-top: 1px solid var(--border);
-  background: rgb(8 9 12 / 0.94);
   padding: 2px 0 calc(env(safe-area-inset-bottom) + 2px);
 }
 
@@ -581,15 +575,22 @@ h2 {
 }
 
 .tabs .glyph {
-  font-size: 22px;
+  font-size: 20px;
 }
 
 .tabs [aria-selected='true'] {
   color: var(--text);
 }
 
+.tabs .glyph {
+  box-sizing: content-box;
+  padding: 3px 18px;
+  border-radius: 999px;
+}
+
 .tabs [aria-selected='true'] .glyph {
   color: var(--accent);
+  background: rgb(52 211 153 / 0.14);
 }
 
 /* Icons */
@@ -621,8 +622,13 @@ circle.i-sun {
   stroke: var(--cloud);
 }
 
+.i-cloud {
+  fill: rgb(212 212 216 / 0.1);
+}
+
+/* Opaque, so a cloud covers the sun or moon behind it. */
 .i-fill {
-  fill: var(--icon-bg);
+  fill: color-mix(in srgb, var(--icon-bg), #d4d4d8 10%);
 }
 
 .i-rain {
@@ -676,7 +682,6 @@ circle.i-sun {
   max-height: calc(100% - var(--top) - 20px);
   margin: var(--top) auto auto;
   padding: 10px 14px 4px;
-  border: 1px solid var(--border);
   border-radius: 18px;
   background: var(--card);
   color: var(--text);
@@ -698,7 +703,6 @@ circle.i-sun {
   min-width: 0;
   height: 40px;
   padding: 0 12px;
-  border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--bg);
   color: var(--text);
@@ -722,13 +726,8 @@ circle.i-sun {
   width: 100%;
   min-height: 46px;
   padding: 8px 2px;
-  border-top: 1px solid var(--border);
   font-size: 16px;
   text-align: left;
-}
-
-.picker-list li:first-child button {
-  border-top: 0;
 }
 
 .picker-list small {
@@ -833,7 +832,6 @@ circle.i-sun {
 
 .card-glass {
   background: rgb(17 19 24 / 0.86);
-  border: 1px solid var(--border);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
@@ -873,7 +871,6 @@ circle.i-sun {
   border-radius: 12px;
   font-size: 18px;
   background: rgb(17 19 24 / 0.86);
-  border: 1px solid var(--border);
 }
 
 .radar-bar {
@@ -991,12 +988,6 @@ circle.i-sun {
   }
   .hero-temp {
     font-size: clamp(4rem, 21vw, 5.2rem);
-  }
-  .card {
-    padding: 10px 12px;
-  }
-  .chart {
-    margin: 4px -12px 0;
   }
 }
 

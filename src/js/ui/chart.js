@@ -313,7 +313,7 @@ export function createChart(el, { onSelect, onView }) {
     const plotBottom = h - PAD.bottom;
     const plotH = plotBottom - plotTop;
     const tempTop = plotTop + 14;
-    const tempBottom = plotBottom - Math.max(20, plotH * 0.3);
+    const tempBottom = plotBottom - Math.max(20, plotH * 0.2);
 
     const temps = points.map((p) => p.temp);
     let lo = Math.min(...temps);
@@ -337,6 +337,8 @@ export function createChart(el, { onSelect, onView }) {
     // with the same fades.
     const box = `x="0" y="0" width="${f1(x(until))}" height="${plotBottom}"`;
     const sky = `<rect fill="url(#c-night)" ${box}/><rect fill="url(#c-day)" mask="url(#c-daylight)" ${box}/>${starsSvg(daylight, from, until, x, 4, plotBottom * 0.7)}`;
+    // Without a card around it the sky fades in at the top instead of ending in an edge.
+    const skyFade = `<linearGradient id="c-sky-fade" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="0" y2="${f1(Math.min(plotBottom, 28))}"><stop offset="0" class="c-mask-off"/><stop offset="1" class="c-mask-on"/></linearGradient><mask id="c-sky-mask" maskUnits="userSpaceOnUse" ${box}><rect fill="url(#c-sky-fade)" ${box}/></mask>`;
     const uvMax = Math.max(1, ...timeline.uv.map((u) => u.uv));
     const layout = { x, h, plotBottom, barMax: plotH * 0.42, uvMax, timezone, hourPx: HOUR * scale };
     const { midnights, labels } = axisSvg(timeline, layout);
@@ -350,10 +352,11 @@ export function createChart(el, { onSelect, onView }) {
 <linearGradient id="c-daylight-fade" gradientUnits="userSpaceOnUse" x1="0" x2="${f1(x(until))}" y1="0" y2="0">${skyStops(daylight, from, until, x, 'c-mask-off', 'c-mask-on')}</linearGradient>
 <mask id="c-daylight" maskUnits="userSpaceOnUse" ${box}><rect fill="url(#c-daylight-fade)" ${box}/></mask>
 <linearGradient id="c-day" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="0" y2="${plotBottom}"><stop offset="0" class="c-sky-top"/><stop offset="1" class="c-sky-horizon"/></linearGradient>
+${skyFade}
 <clipPath id="c-clip"><rect x="0" y="0" width="${f1(x(until))}" height="${plotBottom}"/></clipPath>
 </defs>
 <g class="c-scroll">
-${sky}${midnights}${barsSvg(timeline, layout)}
+<g mask="url(#c-sky-mask)">${sky}</g>${midnights}${barsSvg(timeline, layout)}
 <g clip-path="url(#c-clip)"><g class="c-curve">
 <path d="${area}" fill="url(#c-area)"/>
 <path class="c-temp" d="${line}" stroke="url(#c-line)" vector-effect="non-scaling-stroke"/>

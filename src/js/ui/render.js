@@ -133,8 +133,7 @@ export function renderDays(view, activeDay) {
       return `<li><button type="button" data-day="${d.time}"${d.time === activeDay ? ' class="is-active"' : ''} aria-label="${dayName(d.time, view.now, tz)} im Diagramm zeigen">
 <span class="d-name">${name}${i === 0 ? '' : `<small>${dayOfMonth(d.time, tz)}.</small>`}</span>
 <span class="d-icon">${weatherIcon(icon, true, label)}</span>
-<span class="d-rain">${rainy ? `${prob} %` : ''}</span>
-<span class="d-mm">${rainy ? `${decimal(d.precipSum, d.precipSum < 10 ? 1 : 0)} mm` : ''}</span>
+<span class="d-rain">${rainy ? `${prob} %<small>${decimal(d.precipSum, d.precipSum < 10 ? 1 : 0)} mm</small>` : ''}</span>
 <span class="d-lo">${temp(d.tempMin)}</span>
 <span class="d-bar"><i style="left:${pos(d.tempMin).toFixed(1)}%;right:${(100 - pos(d.tempMax)).toFixed(1)}%;background:linear-gradient(90deg,${tempColor(d.tempMin)},${tempColor(d.tempMax)})"></i>${dot}</span>
 <span class="d-hi">${temp(d.tempMax)}</span>
