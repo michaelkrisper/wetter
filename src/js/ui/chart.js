@@ -378,7 +378,7 @@ export function createChart(el, { onSelect, onView }) {
     const clouds = cloudSvg(timeline.sky, until, x, box, plotBottom);
     const sky = `<rect fill="url(#c-night)" ${box}/><rect fill="url(#c-day)" mask="url(#c-daylight)" ${box}/>${starsSvg(daylight, from, until, x, 4, plotBottom * 0.7, timeline.sky)}${clouds.svg}`;
     // Without a card around it the sky fades in at the top instead of ending in an edge.
-    const skyFade = `<linearGradient id="c-sky-fade" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="0" y2="${f1(Math.min(plotBottom, 28))}"><stop offset="0" class="c-mask-off"/><stop offset="1" class="c-mask-on"/></linearGradient><mask id="c-sky-mask" maskUnits="userSpaceOnUse" ${box}><rect fill="url(#c-sky-fade)" ${box}/></mask>`;
+    const skyFade = `<linearGradient id="c-sky-fade" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="0" y2="${f1(Math.min(plotBottom, 64))}"><stop offset="0" class="c-mask-off"/><stop offset=".4" class="c-mask-half"/><stop offset="1" class="c-mask-on"/></linearGradient><mask id="c-sky-mask" maskUnits="userSpaceOnUse" ${box}><rect fill="url(#c-sky-fade)" ${box}/></mask>`;
     const uvMax = Math.max(1, ...timeline.uv.map((u) => u.uv));
     const layout = { x, h, plotBottom, barMax: plotH * 0.42, uvMax, timezone, hourPx: HOUR * scale };
     const { midnights, labels } = axisSvg(timeline, layout);
