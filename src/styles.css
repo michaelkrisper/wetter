@@ -369,24 +369,130 @@ h2 {
   stop-color: rgb(71 85 105);
 }
 
+/* Clouds sway, wider and faster in more wind; every other puff the other way. */
+.c-sway {
+  animation: c-sway-0 7s ease-in-out infinite alternate;
+}
+
+.c-sway-1 {
+  animation-name: c-sway-1;
+  animation-duration: 4s;
+}
+
+.c-sway-2 {
+  animation-name: c-sway-2;
+  animation-duration: 2s;
+}
+
+.c-sway-alt {
+  animation-direction: alternate-reverse;
+}
+
+@keyframes c-sway-0 {
+  from {
+    transform: translateX(-1.5px);
+  }
+  to {
+    transform: translateX(1.5px);
+  }
+}
+
+@keyframes c-sway-1 {
+  from {
+    transform: translateX(-3px);
+  }
+  to {
+    transform: translateX(3px);
+  }
+}
+
+@keyframes c-sway-2 {
+  from {
+    transform: translateX(-5px);
+  }
+  to {
+    transform: translateX(5px);
+  }
+}
+
+/* Drops and flakes move down along their lines: the dash offset runs one
+   dash period. */
 .c-drop,
 .c-flake {
   fill: none;
   stroke: var(--rain);
   stroke-linecap: round;
   stroke-width: 1.5;
+  stroke-dasharray: 5 10;
+  animation: c-rain 0.25s linear infinite;
 }
 
 .c-flake {
   stroke: #e2e8f0;
   stroke-width: 2.4;
+  stroke-dasharray: 0 9;
+  animation: c-snow 1s linear infinite;
 }
 
+@keyframes c-rain {
+  from {
+    stroke-dashoffset: 15;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes c-snow {
+  from {
+    stroke-dashoffset: 9;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* A gust is drawn on along its path and wiped off again, then rests. The dash
+   is longer than the longest gust (GUSTS in chart.js). */
 .c-gust {
   fill: none;
-  stroke: rgb(255 255 255 / 0.45);
+  stroke: rgb(148 163 184 / 0.9);
   stroke-linecap: round;
-  stroke-width: 1;
+  stroke-width: 1.4;
+  stroke-dasharray: 56 56;
+  animation: c-gust 2.6s linear infinite;
+}
+
+.c-gust-2 {
+  stroke-width: 1.8;
+  animation-duration: 1.4s;
+}
+
+.c-gust-alt {
+  animation-delay: -1.3s;
+}
+
+.c-gust-2.c-gust-alt {
+  animation-delay: -0.7s;
+}
+
+@keyframes c-gust {
+  from {
+    stroke-dashoffset: 56;
+  }
+  70%,
+  to {
+    stroke-dashoffset: -56;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .c-sway,
+  .c-drop,
+  .c-flake,
+  .c-gust {
+    animation: none;
+  }
 }
 
 .c-wind {
@@ -430,16 +536,8 @@ h2 {
   font-weight: 600;
 }
 
-.c-bar {
-  fill: var(--rain);
-}
-
 .c-uv {
   fill: var(--sun);
-}
-
-.c-cut {
-  fill: #000;
 }
 
 .c-amount {

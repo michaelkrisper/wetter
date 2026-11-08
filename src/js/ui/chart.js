@@ -1,9 +1,9 @@
-// The forecast chart: temperature curve over precipitation bars for the whole
-// week, 12 hours wide on screen (a day jumped to shows all 24). Drag (or wheel)
-// to scroll, tap a point to inspect it. Bar height is the amount, bar opacity
-// the probability. Sun and moon rise/set are marked at their time along the
-// bottom. Drawn at the container's real pixel size; scrolling only moves a
-// transform, so it stays smooth.
+// The forecast chart: temperature curve under a sky of clouds, rain and wind for
+// the whole week, 12 hours wide on screen (a day jumped to shows all 24). Drag
+// (or wheel) to scroll, tap a point to inspect it. Rain hangs from the clouds,
+// as deep as the amount and as opaque as the probability. Sun and moon rise/set
+// are marked at their time along the bottom. Drawn at the container's real pixel
+// size; scrolling only moves a transform, so it stays smooth.
 
 import { WIND_KMH } from '../config.js';
 import { rainScale, tempColor } from './colors.js';
@@ -16,6 +16,10 @@ const PAD = { top: 18, bottom: 36 };
 // Cloud band just below the wind row.
 const CLOUD_TOP = 14;
 const CLOUD_H = 30;
+// Rain starts at the base of the puffs.
+const RAIN_TOP = CLOUD_TOP + CLOUD_H * 0.8;
+// The least precipitation (mm/h) that is drawn.
+const WET_MM = 0.05;
 // Hour labels every hour where they fit, every 3 hours otherwise.
 const HOURLY_LABEL_PX = 24;
 // The temperature axis fits what is on screen, but spans at least this many
@@ -94,33 +98,34 @@ function skyStops(daylight, from, until, x, night, day) {
 // whole chart only washed it out. Soft edges come from a radial gradient, not a
 // blur or mask: Safari repaints those on every scroll frame. Scattered by a
 // fixed hash of the time, so the clouds stay put across redraws.
-// Where a precipitation bar is drawn the puffs turn grey and rain (dashes) or
-// snow (dots) falls from them, as dense as the bar is high and as opaque; a wet
-// hour without cover still gets clouds. From a fresh breeze on the puffs stretch
-// and the rain slants, strong wind adds gust streaks.
-function cloudSvg(sky, bars, daylight, x, hourPx) {
+// Where it rains or snows the puffs turn grey, and below every precipitation
+// interval rain (falling dashes) or snow (dots) hangs from the cloud base like
+// an upside-down bar: as deep as the amount (to the ground from 10 mm/h, the
+// same scale the bars had) and as opaque as the probability. A wet hour without
+// cover still gets clouds. The puffs sway, faster and wider in more wind; from a
+// fresh breeze on they stretch, the rain slants and grey gusts sweep through and
+// curl, bigger and faster in strong wind. Animated in CSS (transforms and dash
+// offsets of a few grouped paths), no masks or filters.
+function cloudSvg({ sky, bars }, daylight, x, hourPx, ground) {
   const isDay = (t) => daylight.some(([rise, set]) => t >= rise && t < set);
-  let svg = '';
-  let gusts = '';
-  const drops = new Map();
+  const puffs = new Map();
+  const gusts = new Map();
   for (const { time, cloud, wind } of sky) {
     const wet = wetAt(bars, time);
-    const gust = windLevel(wind);
-    if (gust === 2) gusts += gustPath(time, x, hourPx);
+    const level = windLevel(wind);
+    if (level) {
+      const key = `c-gust c-gust-${level}${Math.round(time / HOUR) % 2 ? ' c-gust-alt' : ''}`;
+      append(gusts, key, gustPath(time, level, x, hourPx));
+    }
     const c = Math.max(cloud ?? 0, wet ? 70 : 0) / 100;
     if (!c) continue;
     const cls = `c-puff-${wet ? 'rain' : 'day'}`;
-    svg += puffsSvg(time, c, isDay(time) ? cls : `${cls}-night`, gust, x, hourPx);
-    if (!wet) continue;
-    // One path per look instead of an element per drop.
-    const key = `${dropClass(wet)} ${rainOpacity(wet.prob).toFixed(1)}`;
-    drops.set(key, (drops.get(key) ?? '') + dropPath(time, wet, wind, x, hourPx));
+    puffsSvg(puffs, time, c, isDay(time) ? cls : `${cls}-night`, level, x, hourPx);
   }
-  for (const [key, d] of drops) {
-    const [cls, opacity] = key.split(' ');
-    svg += `<path class="${cls}" d="${d}" opacity="${opacity}"/>`;
-  }
-  if (gusts) svg += `<path class="c-gust" d="${gusts}"/>`;
+  // Rain first, so it comes out of the cloud.
+  let svg = rainSvg(sky, bars, x, hourPx, ground);
+  for (const [cls, group] of puffs) svg += `<g class="${cls}">${group}</g>`;
+  for (const [cls, d] of gusts) svg += `<path class="${cls}" d="${d}"/>`;
   if (!svg) return { defs: '', svg: '' };
   const puff = (id) =>
     `<radialGradient id="${id}"><stop offset="0" class="${id}" stop-opacity=".95"/><stop offset=".55" class="${id}" stop-opacity=".7"/><stop offset="1" class="${id}" stop-opacity="0"/></radialGradient>`;
@@ -130,19 +135,39 @@ function cloudSvg(sky, bars, daylight, x, hourPx) {
   };
 }
 
-const dropClass = (wet) => (wet.type === 'snow' ? 'c-flake' : 'c-drop');
-const windLevel = (wind) => (wind >= WIND_KMH.strong ? 2 : wind >= WIND_KMH.fresh ? 1 : 0);
+const append = (map, key, svg) => map.set(key, (map.get(key) ?? '') + svg);
 
-// The heaviest bar drawn within this hour, the same threshold as barsSvg.
+// One path per look instead of an element per drop.
+function rainSvg(sky, bars, x, hourPx, ground) {
+  const paths = new Map();
+  for (const bar of bars) {
+    if (bar.rate < WET_MM) continue;
+    const key = `${dropClass(bar)} ${rainOpacity(bar.prob).toFixed(1)}`;
+    append(paths, key, rainPath(bar, windAt(sky, bar), x, hourPx, ground));
+  }
+  let svg = '';
+  for (const [key, d] of paths) {
+    const [cls, opacity] = key.split(' ');
+    svg += `<path class="${cls}" d="${d}" opacity="${opacity}"/>`;
+  }
+  return svg;
+}
+
+const dropClass = (bar) => (bar.type === 'snow' ? 'c-flake' : 'c-drop');
+const windLevel = (wind) => (wind >= WIND_KMH.strong ? 2 : wind >= WIND_KMH.fresh ? 1 : 0);
+const windAt = (sky, bar) => sky.find((s) => Math.abs(s.time - (bar.start + bar.end) / 2) <= HOUR / 2)?.wind;
+
+// The heaviest precipitation drawn within this hour.
 const wetAt = (bars, time) =>
   bars
-    .filter((b) => b.rate >= 0.05 && b.start < time + HOUR / 2 && b.end > time - HOUR / 2)
+    .filter((b) => b.rate >= WET_MM && b.start < time + HOUR / 2 && b.end > time - HOUR / 2)
     .reduce((a, b) => (a && a.rate >= b.rate ? a : b), null);
 
-function puffsSvg(time, c, cls, gust, x, hourPx) {
+// Puffs go into groups that sway alike: by wind level, every other one the
+// opposite way.
+function puffsSvg(groups, time, c, cls, gust, x, hourPx) {
   const t = time / HOUR;
   const stretch = 1.6 * (1 + 0.3 * gust);
-  let svg = '';
   for (let i = 0, count = Math.max(1, Math.round(c * 4)); i < count; i++) {
     const r1 = hash(t + i * 0.37);
     const r2 = hash(t + i * 0.71 + 0.5);
@@ -150,33 +175,46 @@ function puffsSvg(time, c, cls, gust, x, hourPx) {
     const ry = CLOUD_H * (0.25 + 0.3 * c) * (0.7 + 0.6 * r3);
     const cx = x(time) + (r1 - 0.5) * hourPx * 1.2;
     const cy = CLOUD_TOP + CLOUD_H * (0.35 + 0.3 * r2);
-    svg += `<ellipse fill="url(#${cls})" cx="${f1(cx)}" cy="${f1(cy)}" rx="${f1(ry * stretch)}" ry="${f1(ry)}" opacity="${(0.45 + 0.55 * c).toFixed(2)}"/>`;
+    const group = `c-sway c-sway-${gust}${i % 2 ? ' c-sway-alt' : ''}`;
+    const puff = `<ellipse fill="url(#${cls})" cx="${f1(cx)}" cy="${f1(cy)}" rx="${f1(ry * stretch)}" ry="${f1(ry)}" opacity="${(0.45 + 0.55 * c).toFixed(2)}"/>`;
+    append(groups, group, puff);
   }
-  return svg;
 }
 
-// Snowflakes are zero-length strokes with round caps, i.e. dots.
-function dropPath(time, wet, wind, x, hourPx) {
-  const t = time / HOUR;
-  const len = wet.type === 'snow' ? 0 : 6;
-  const slant = Math.min(0.8, (wind ?? 0) / 60);
+// Straight lines a few pixels apart across the interval (closer the heavier),
+// along which the dashes or dots fall (CSS). Each starts a random bit up inside
+// the cloud, so the drops do not fall in rows. In wind the column leans, at most
+// a little over half an hour, so the rain stays at its time.
+function rainPath(bar, wind, x, hourPx, ground) {
+  const s = rainScale(bar.rate);
+  const bottom = RAIN_TOP + s * (ground - RAIN_TOP);
+  const left = x(bar.start);
+  const width = x(bar.end) - left;
+  const lean = Math.min(Math.min(0.8, (wind ?? 0) / 60) * (bottom - RAIN_TOP), hourPx * 0.6);
+  const slope = lean / Math.max(1, bottom - RAIN_TOP);
+  const t = bar.start / HOUR;
   let d = '';
-  for (let i = 0, n = Math.round(2 + rainScale(wet.rate) * 6); i < n; i++) {
-    const dx = x(time) + (hash(t + i * 0.61 + 0.9) - 0.5) * hourPx;
-    const dy = CLOUD_TOP + CLOUD_H * 0.8 + hash(t + i * 0.43 + 0.3) * 12;
-    d += `M${f1(dx)} ${f1(dy)}l${f1(len * slant)} ${len}`;
+  for (let i = 0, n = Math.max(1, Math.round(width / (9 - 5 * s))); i < n; i++) {
+    const top = RAIN_TOP - hash(t + i * 0.43 + 0.3) * 15;
+    const mid = left + ((i + hash(t + i * 0.61 + 0.9)) / n) * width;
+    const x0 = mid - lean / 2 - slope * (RAIN_TOP - top);
+    d += `M${f1(x0)} ${f1(top)}l${f1(slope * (bottom - top))} ${f1(bottom - top)}`;
   }
   return d;
 }
 
-function gustPath(time, x, hourPx) {
+// A streak that ends in a curl, drawn on and wiped off along its length (CSS).
+// The strong-wind one is bigger; both stay within the 56 px dash in styles.css.
+const GUSTS = [null, { len: 14, r: 3.5 }, { len: 24, r: 6 }];
+
+function gustPath(time, level, x, hourPx) {
   const t = time / HOUR;
-  const len = hourPx * 0.6;
+  const { len, r } = GUSTS[level];
   let d = '';
-  for (let i = 0; i < 2; i++) {
-    const gx = x(time) + (hash(t + i * 0.53 + 0.1) - 0.5) * hourPx;
-    const gy = CLOUD_TOP + CLOUD_H * (0.2 + 0.6 * hash(t + i * 0.29 + 0.6));
-    d += `M${f1(gx - len / 2)} ${f1(gy)}h${f1(len)}a2.5 2.5 0 1 0 -2.5 -2.5`;
+  for (let i = 0; i < level; i++) {
+    const gx = x(time) + (hash(t + i * 0.53 + 0.1) - 0.5) * hourPx - len / 2;
+    const gy = CLOUD_TOP + CLOUD_H * (0.45 + 0.45 * hash(t + i * 0.29 + 0.6));
+    d += `M${f1(gx)} ${f1(gy)}h${len}a${r} ${r} 0 1 0 0 ${-2 * r}a${r * 0.55} ${r * 0.55} 0 1 0 0 ${f1(r * 1.1)}`;
   }
   return d;
 }
@@ -235,35 +273,29 @@ const EVENT_ICONS = {
     '<path class="c-ev-moon" d="M2.6 2A3.6 3.6 0 1 1-1 -3.4 2.8 2.8 0 0 0 2.6 2Z"/><path class="c-ev-arrow" d="M-3 6 0 9 3 6"/>',
 };
 
-const barHeight = (rate, barMax) => Math.max(2, rainScale(rate) * barMax);
 // The week's highest UV index fills the bar area.
 const uvHeight = (uv, { barMax, uvMax }) => (uv / uvMax) * barMax;
 // Unlikely rain fades out quickly: 10 % is just visible, 50 % still pale.
 const rainOpacity = (prob) => (prob == null ? 1 : 0.07 + 0.93 * (prob / 100) ** 2);
 
-// Precipitation: height = amount, opacity = probability (nowcast: full). UV
-// bars sit underneath in yellow, cut out where it rains, so a pale rain bar
-// does not turn green.
-function barsSvg({ bars, uv, until }, layout) {
-  const { x, plotBottom, barMax } = layout;
-  const rect = (cls, start, end, height, opacity) =>
-    `<rect class="${cls}" x="${f1(x(start) + 0.6)}" y="${f1(plotBottom - height)}" width="${f1(Math.max(1, x(end) - x(start) - 1.2))}" height="${f1(height)}" rx="1.5" opacity="${opacity.toFixed(2)}"/>`;
-  const uvSvg = uv.map((u) => rect('c-uv', u.start, u.end, uvHeight(u.uv, layout), 0.55)).join('');
-  const rain = bars.filter((b) => b.rate >= 0.05);
-  const rainSvg = (cls, opacity) =>
-    rain.map((b) => rect(cls, b.start, b.end, barHeight(b.rate, barMax), opacity(b.prob))).join('');
-  const width = f1(x(until));
-  const cut = `<mask id="c-uv-cut" maskUnits="userSpaceOnUse" x="0" y="0" width="${width}" height="${plotBottom}"><rect width="${width}" height="${plotBottom}" fill="#fff"/>${rainSvg('c-cut', () => 1)}</mask>`;
-  return `${cut}<g mask="url(#c-uv-cut)">${uvSvg}</g>${rainSvg('c-bar', rainOpacity)}`;
+// UV bars along the bottom in yellow; the rain falls behind them.
+function uvBarsSvg({ uv }, layout) {
+  const { x, plotBottom } = layout;
+  return uv
+    .map((u) => {
+      const height = uvHeight(u.uv, layout);
+      return `<rect class="c-uv" x="${f1(x(u.start) + 0.6)}" y="${f1(plotBottom - height)}" width="${f1(Math.max(1, x(u.end) - x(u.start) - 1.2))}" height="${f1(height)}" rx="1.5" opacity="0.55"/>`;
+    })
+    .join('');
 }
 
-// The amount of every rain spell (see model.js) above its highest bar; the
-// probability is in the bars' opacity.
-function amountLabels(spells, { x, plotBottom, barMax }) {
+// The amount of every rain spell (see model.js) just below the cloud, over its
+// heaviest interval; the probability is in the drops' opacity.
+function amountLabels(spells, { x }) {
   return spells
     .map(
-      ({ wettest, prob, peak, total }) =>
-        `<text class="c-amount" x="${f1((x(wettest.start) + x(wettest.end)) / 2)}" y="${f1(plotBottom - barHeight(peak, barMax) - 4)}" text-anchor="middle" fill-opacity="${Math.max(0.5, rainOpacity(prob)).toFixed(2)}">${decimal(total, total < 10 ? 1 : 0)} mm</text>`,
+      ({ wettest, prob, total }) =>
+        `<text class="c-amount" x="${f1((x(wettest.start) + x(wettest.end)) / 2)}" y="${f1(RAIN_TOP + 11)}" text-anchor="middle" fill-opacity="${Math.max(0.5, rainOpacity(prob)).toFixed(2)}">${decimal(total, total < 10 ? 1 : 0)} mm</text>`,
     )
     .join('');
 }
@@ -453,7 +485,7 @@ export function createChart(el, { onSelect, onView }) {
     // Night: a dark veil. Day: a blue sky, deeper on top, shown through a mask
     // with the same fades.
     const box = `x="0" y="0" width="${f1(x(until))}" height="${plotBottom}"`;
-    const clouds = cloudSvg(timeline.sky, timeline.bars, daylight, x, HOUR * scale);
+    const clouds = cloudSvg(timeline, daylight, x, HOUR * scale, plotBottom);
     const sky = `<rect fill="url(#c-night)" ${box}/><rect fill="url(#c-day)" mask="url(#c-daylight)" ${box}/>${starsSvg(daylight, from, until, x, 4, plotBottom * 0.7, timeline.sky)}`;
     // Without a card around it the sky fades in at the top instead of ending in
     // an edge: page colour laid over it, cheaper to scroll than a mask. Only behind
@@ -478,7 +510,7 @@ ${clouds.defs}
 <clipPath id="c-clip"><rect x="0" y="0" width="${f1(x(until))}" height="${plotBottom}"/></clipPath>
 </defs>
 <g class="c-scroll">
-${sky}<rect fill="url(#c-sky-fade)" x="0" y="0" width="${f1(x(until))}" height="${fadeH}"/>${clouds.svg}${midnights}${barsSvg(timeline, layout)}
+${sky}<rect fill="url(#c-sky-fade)" x="0" y="0" width="${f1(x(until))}" height="${fadeH}"/>${clouds.svg}${midnights}${uvBarsSvg(timeline, layout)}
 <g clip-path="url(#c-clip)"><g class="c-curve">
 <path d="${area}" fill="url(#c-area)"/>
 <path class="c-temp" d="${line}" stroke="url(#c-line)" vector-effect="non-scaling-stroke"/>
