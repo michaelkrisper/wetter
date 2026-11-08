@@ -1,7 +1,8 @@
 // The forecast chart: temperature curve under a sky of clouds, rain and wind for
 // the whole week, 12 hours wide on screen (a day jumped to shows all 24). Drag
 // (or wheel) to scroll, tap a point to inspect it. Rain hangs from the clouds,
-// as deep as the amount and as opaque as the probability. Sun and moon rise/set
+// as deep as the amount and as opaque as the probability; suns on top of them
+// grow with the UV index. Sun and moon rise/set
 // are marked at their time along the bottom. Drawn at the container's real pixel
 // size; scrolling only moves a transform, so it stays smooth.
 
@@ -273,20 +274,38 @@ const EVENT_ICONS = {
     '<path class="c-ev-moon" d="M2.6 2A3.6 3.6 0 1 1-1 -3.4 2.8 2.8 0 0 0 2.6 2Z"/><path class="c-ev-arrow" d="M-3 6 0 9 3 6"/>',
 };
 
-// The week's highest UV index fills the bar area.
-const uvHeight = (uv, { barMax, uvMax }) => (uv / uvMax) * barMax;
 // Unlikely rain fades out quickly: 10 % is just visible, 50 % still pale.
 const rainOpacity = (prob) => (prob == null ? 1 : 0.07 + 0.93 * (prob / 100) ** 2);
 
-// UV bars along the bottom in yellow; the rain falls behind them.
-function uvBarsSvg({ uv }, layout) {
-  const { x, plotBottom } = layout;
-  return uv
-    .map((u) => {
-      const height = uvHeight(u.uv, layout);
-      return `<rect class="c-uv" x="${f1(x(u.start) + 0.6)}" y="${f1(plotBottom - height)}" width="${f1(Math.max(1, x(u.end) - x(u.start) - 1.2))}" height="${f1(height)}" rx="1.5" opacity="0.55"/>`;
-    })
-    .join('');
+// The UV index as a sun per hour on top of the cloud band, by WHO danger level:
+// none while low (below 3), small from moderate (3), medium from high (6), large
+// from very high (8). Shrunk where hours get narrow (a whole day on screen).
+const UV_SUNS = [
+  { from: 8, r: 5 },
+  { from: 6, r: 3.6 },
+  { from: 3, r: 2.4 },
+];
+const SUN_Y = CLOUD_TOP + 9;
+
+function uvSunsSvg(uv, x, hourPx) {
+  const k = Math.min(1, hourPx / 25);
+  const paths = UV_SUNS.map(() => '');
+  for (const u of uv) {
+    const level = UV_SUNS.findIndex(({ from }) => u.uv >= from);
+    if (level >= 0) paths[level] += sunPath((x(u.start) + x(u.end)) / 2, SUN_Y, UV_SUNS[level].r * k);
+  }
+  return paths.map((d, level) => (d ? `<path class="c-uv-sun c-uv-sun-${level}" d="${d}"/>` : '')).join('');
+}
+
+// A disc and eight rays; the rays are open lines, so only the disc is filled.
+function sunPath(cx, cy, r) {
+  let d = `M${f1(cx - r)} ${f1(cy)}a${f1(r)} ${f1(r)} 0 1 0 ${f1(2 * r)} 0a${f1(r)} ${f1(r)} 0 1 0 ${f1(-2 * r)} 0`;
+  for (let i = 0; i < 8; i++) {
+    const c = Math.cos((i * Math.PI) / 4);
+    const s = Math.sin((i * Math.PI) / 4);
+    d += `M${f1(cx + c * r * 1.45)} ${f1(cy + s * r * 1.45)}l${f1(c * r * 0.6)} ${f1(s * r * 0.6)}`;
+  }
+  return d;
 }
 
 // The amount of every rain spell (see model.js) just below the cloud, over its
@@ -323,20 +342,6 @@ function axisSvg({ from, until, now, events }, { x, h, plotBottom, timezone, hou
     )
     .join('');
   return { midnights, labels: labels + icons };
-}
-
-// Highest UV index of every day, above its bar.
-function uvLabels(uv, days, layout) {
-  const { x, plotBottom } = layout;
-  let svg = '';
-  for (const { time: start } of days) {
-    const inDay = uv.filter((u) => u.start + HOUR / 2 >= start && u.start + HOUR / 2 < start + 24 * HOUR);
-    if (!inDay.length) continue;
-    const top = inDay.reduce((a, b) => (b.uv > a.uv ? b : a));
-    if (Math.round(top.uv) < 1) continue;
-    svg += `<text class="c-uv-max" x="${f1((x(top.start) + x(top.end)) / 2)}" y="${f1(plotBottom - uvHeight(top.uv, layout) - 4)}" text-anchor="middle">UV ${Math.round(top.uv)}</text>`;
-  }
-  return svg;
 }
 
 // Warmest and coldest point of every day, right on the curve.
@@ -460,9 +465,10 @@ export function createChart(el, { onSelect, onView }) {
     scale = w / span;
     const plotTop = PAD.top;
     const plotBottom = h - PAD.bottom;
-    const plotH = plotBottom - plotTop;
-    const tempTop = plotTop + 14;
-    const tempBottom = plotBottom - Math.max(20, plotH * 0.2);
+    // Below the cloud band and the rain amounts, so the warmest label stays clear
+    // of both and of the suns; at the bottom only room for the coldest label.
+    const tempTop = RAIN_TOP + 30;
+    const tempBottom = plotBottom - 24;
 
     const temps = points.map((p) => p.temp);
     let lo = Math.min(...temps);
@@ -492,8 +498,7 @@ export function createChart(el, { onSelect, onView }) {
     // the wind row, so the cloud band below shows the full sky.
     const fadeH = f1(Math.min(plotBottom, CLOUD_TOP + 6));
     const skyFade = `<linearGradient id="c-sky-fade" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="0" y2="${fadeH}"><stop offset="0" class="c-page" stop-opacity="1"/><stop offset=".4" class="c-page" stop-opacity=".55"/><stop offset="1" class="c-page" stop-opacity="0"/></linearGradient>`;
-    const uvMax = Math.max(1, ...timeline.uv.map((u) => u.uv));
-    const layout = { x, h, plotBottom, barMax: plotH * 0.42, uvMax, timezone, hourPx: HOUR * scale };
+    const layout = { x, h, plotBottom, timezone, hourPx: HOUR * scale };
     const { midnights, labels } = axisSvg(timeline, layout);
 
     const nowX = x(now);
@@ -510,13 +515,13 @@ ${clouds.defs}
 <clipPath id="c-clip"><rect x="0" y="0" width="${f1(x(until))}" height="${plotBottom}"/></clipPath>
 </defs>
 <g class="c-scroll">
-${sky}<rect fill="url(#c-sky-fade)" x="0" y="0" width="${f1(x(until))}" height="${fadeH}"/>${clouds.svg}${midnights}${uvBarsSvg(timeline, layout)}
+${sky}<rect fill="url(#c-sky-fade)" x="0" y="0" width="${f1(x(until))}" height="${fadeH}"/>${clouds.svg}${uvSunsSvg(timeline.uv, x, HOUR * scale)}${midnights}
 <g clip-path="url(#c-clip)"><g class="c-curve">
 <path d="${area}" fill="url(#c-area)"/>
 <path class="c-temp" d="${line}" stroke="url(#c-line)" vector-effect="non-scaling-stroke"/>
 </g></g>
 <rect class="c-past" x="0" y="0" width="${f1(nowX)}" height="${h}"/>
-${uvLabels(timeline.uv, days, layout)}${amountLabels(spells, layout)}${extremesSvg(points, xy, days)}${windSvg(timeline.sky, x, timezone)}${labels}
+${amountLabels(spells, layout)}${extremesSvg(points, xy, days)}${windSvg(timeline.sky, x, timezone)}${labels}
 <line class="c-now" x1="${f1(nowX)}" x2="${f1(nowX)}" y1="${plotTop - 2}" y2="${plotBottom}"/>
 <text class="c-label c-now-label" x="${f1(nowX)}" y="${h - 4}" text-anchor="middle">jetzt</text>
 <g class="c-marker" hidden><line y1="0" y2="${plotBottom}"/><circle r="4.5"/></g>
