@@ -94,28 +94,91 @@ function skyStops(daylight, from, until, x, night, day) {
 // whole chart only washed it out. Soft edges come from a radial gradient, not a
 // blur or mask: Safari repaints those on every scroll frame. Scattered by a
 // fixed hash of the time, so the clouds stay put across redraws.
-function cloudSvg(sky, daylight, x, hourPx) {
+// Where a precipitation bar is drawn the puffs turn grey and rain (dashes) or
+// snow (dots) falls from them, as dense as the bar is high and as opaque; a wet
+// hour without cover still gets clouds. From a fresh breeze on the puffs stretch
+// and the rain slants, strong wind adds gust streaks.
+function cloudSvg(sky, bars, daylight, x, hourPx) {
   const isDay = (t) => daylight.some(([rise, set]) => t >= rise && t < set);
   let svg = '';
-  for (const { time, cloud } of sky) {
-    if (!cloud) continue;
-    const c = cloud / 100;
-    const count = Math.max(1, Math.round(c * 4));
-    const cls = isDay(time) ? 'c-puff-day' : 'c-puff-night';
-    for (let i = 0; i < count; i++) {
-      const r1 = hash(time / HOUR + i * 0.37);
-      const r2 = hash(time / HOUR + i * 0.71 + 0.5);
-      const r3 = hash(time / HOUR + i * 0.13 + 0.25);
-      const ry = CLOUD_H * (0.25 + 0.3 * c) * (0.7 + 0.6 * r3);
-      const cx = x(time) + (r1 - 0.5) * hourPx * 1.2;
-      const cy = CLOUD_TOP + CLOUD_H * (0.35 + 0.3 * r2);
-      svg += `<ellipse fill="url(#${cls})" cx="${f1(cx)}" cy="${f1(cy)}" rx="${f1(ry * 1.6)}" ry="${f1(ry)}" opacity="${(0.45 + 0.55 * c).toFixed(2)}"/>`;
-    }
+  let gusts = '';
+  const drops = new Map();
+  for (const { time, cloud, wind } of sky) {
+    const wet = wetAt(bars, time);
+    const gust = windLevel(wind);
+    if (gust === 2) gusts += gustPath(time, x, hourPx);
+    const c = Math.max(cloud ?? 0, wet ? 70 : 0) / 100;
+    if (!c) continue;
+    const cls = `c-puff-${wet ? 'rain' : 'day'}`;
+    svg += puffsSvg(time, c, isDay(time) ? cls : `${cls}-night`, gust, x, hourPx);
+    if (!wet) continue;
+    // One path per look instead of an element per drop.
+    const key = `${dropClass(wet)} ${rainOpacity(wet.prob).toFixed(1)}`;
+    drops.set(key, (drops.get(key) ?? '') + dropPath(time, wet, wind, x, hourPx));
   }
+  for (const [key, d] of drops) {
+    const [cls, opacity] = key.split(' ');
+    svg += `<path class="${cls}" d="${d}" opacity="${opacity}"/>`;
+  }
+  if (gusts) svg += `<path class="c-gust" d="${gusts}"/>`;
   if (!svg) return { defs: '', svg: '' };
   const puff = (id) =>
     `<radialGradient id="${id}"><stop offset="0" class="${id}" stop-opacity=".95"/><stop offset=".55" class="${id}" stop-opacity=".7"/><stop offset="1" class="${id}" stop-opacity="0"/></radialGradient>`;
-  return { defs: puff('c-puff-day') + puff('c-puff-night'), svg };
+  return {
+    defs: ['c-puff-day', 'c-puff-day-night', 'c-puff-rain', 'c-puff-rain-night'].map(puff).join(''),
+    svg,
+  };
+}
+
+const dropClass = (wet) => (wet.type === 'snow' ? 'c-flake' : 'c-drop');
+const windLevel = (wind) => (wind >= WIND_KMH.strong ? 2 : wind >= WIND_KMH.fresh ? 1 : 0);
+
+// The heaviest bar drawn within this hour, the same threshold as barsSvg.
+const wetAt = (bars, time) =>
+  bars
+    .filter((b) => b.rate >= 0.05 && b.start < time + HOUR / 2 && b.end > time - HOUR / 2)
+    .reduce((a, b) => (a && a.rate >= b.rate ? a : b), null);
+
+function puffsSvg(time, c, cls, gust, x, hourPx) {
+  const t = time / HOUR;
+  const stretch = 1.6 * (1 + 0.3 * gust);
+  let svg = '';
+  for (let i = 0, count = Math.max(1, Math.round(c * 4)); i < count; i++) {
+    const r1 = hash(t + i * 0.37);
+    const r2 = hash(t + i * 0.71 + 0.5);
+    const r3 = hash(t + i * 0.13 + 0.25);
+    const ry = CLOUD_H * (0.25 + 0.3 * c) * (0.7 + 0.6 * r3);
+    const cx = x(time) + (r1 - 0.5) * hourPx * 1.2;
+    const cy = CLOUD_TOP + CLOUD_H * (0.35 + 0.3 * r2);
+    svg += `<ellipse fill="url(#${cls})" cx="${f1(cx)}" cy="${f1(cy)}" rx="${f1(ry * stretch)}" ry="${f1(ry)}" opacity="${(0.45 + 0.55 * c).toFixed(2)}"/>`;
+  }
+  return svg;
+}
+
+// Snowflakes are zero-length strokes with round caps, i.e. dots.
+function dropPath(time, wet, wind, x, hourPx) {
+  const t = time / HOUR;
+  const len = wet.type === 'snow' ? 0 : 6;
+  const slant = Math.min(0.8, (wind ?? 0) / 60);
+  let d = '';
+  for (let i = 0, n = Math.round(2 + rainScale(wet.rate) * 6); i < n; i++) {
+    const dx = x(time) + (hash(t + i * 0.61 + 0.9) - 0.5) * hourPx;
+    const dy = CLOUD_TOP + CLOUD_H * 0.8 + hash(t + i * 0.43 + 0.3) * 12;
+    d += `M${f1(dx)} ${f1(dy)}l${f1(len * slant)} ${len}`;
+  }
+  return d;
+}
+
+function gustPath(time, x, hourPx) {
+  const t = time / HOUR;
+  const len = hourPx * 0.6;
+  let d = '';
+  for (let i = 0; i < 2; i++) {
+    const gx = x(time) + (hash(t + i * 0.53 + 0.1) - 0.5) * hourPx;
+    const gy = CLOUD_TOP + CLOUD_H * (0.2 + 0.6 * hash(t + i * 0.29 + 0.6));
+    d += `M${f1(gx - len / 2)} ${f1(gy)}h${f1(len)}a2.5 2.5 0 1 0 -2.5 -2.5`;
+  }
+  return d;
 }
 
 // Wind speed every 3 hours along the top, highlighted from a fresh breeze on.
@@ -390,7 +453,7 @@ export function createChart(el, { onSelect, onView }) {
     // Night: a dark veil. Day: a blue sky, deeper on top, shown through a mask
     // with the same fades.
     const box = `x="0" y="0" width="${f1(x(until))}" height="${plotBottom}"`;
-    const clouds = cloudSvg(timeline.sky, daylight, x, HOUR * scale);
+    const clouds = cloudSvg(timeline.sky, timeline.bars, daylight, x, HOUR * scale);
     const sky = `<rect fill="url(#c-night)" ${box}/><rect fill="url(#c-day)" mask="url(#c-daylight)" ${box}/>${starsSvg(daylight, from, until, x, 4, plotBottom * 0.7, timeline.sky)}`;
     // Without a card around it the sky fades in at the top instead of ending in
     // an edge: page colour laid over it, cheaper to scroll than a mask. Only behind
