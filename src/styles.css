@@ -536,8 +536,19 @@ h2 {
   font-weight: 600;
 }
 
-.c-uv {
+.c-uv-sun {
   fill: var(--sun);
+  stroke: var(--sun);
+  stroke-linecap: round;
+  stroke-width: 1;
+}
+
+.c-uv-sun-0 {
+  stroke-width: 1.5;
+}
+
+.c-uv-sun-1 {
+  stroke-width: 1.2;
 }
 
 .c-amount {
@@ -590,15 +601,6 @@ h2 {
   stroke-width: 2.5;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-.c-uv-max {
-  fill: var(--sun);
-  font-size: 10px;
-  font-weight: 600;
-  paint-order: stroke;
-  stroke: var(--card);
-  stroke-width: 3px;
 }
 
 .c-extreme {

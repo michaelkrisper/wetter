@@ -192,7 +192,7 @@ function temperaturePoints({ hourly, minutely, nowcast }, now, until, current, f
   return points;
 }
 
-// The whole forecast as one timeline: temperature, precipitation and UV bars,
+// The whole forecast as one timeline: temperature, precipitation and UV intervals,
 // cloud cover and wind per hour, sun and moon events.
 function timeline(forecast, now, until, current, steps, from) {
   const { hourly, daily } = forecast;
@@ -202,7 +202,7 @@ function timeline(forecast, now, until, current, steps, from) {
     .flatMap((d) => ['sunrise', 'sunset', 'moonrise', 'moonset'].map((kind) => ({ time: d[kind], kind })))
     .filter(({ time }) => time >= from && time <= end)
     .sort((a, b) => a.time - b.time);
-  // UV index is an hourly value; its bar is centred on the hour.
+  // UV index is an hourly value; its interval is centred on the hour.
   const uv = hourly
     .filter((h) => h.time >= from && h.time <= end && h.uv >= 0.5)
     .map((h) => ({ start: h.time - HOUR / 2, end: h.time + HOUR / 2, uv: h.uv }));
