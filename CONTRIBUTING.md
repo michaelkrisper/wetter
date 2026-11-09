@@ -28,7 +28,7 @@ an issue first for larger changes.
 
 ## Setup
 
-Requirements: Node.js 24.
+Requirements: Node.js 26 (see `.nvmrc`).
 
 ```sh
 npm ci
