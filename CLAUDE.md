@@ -91,5 +91,6 @@ npm run borders        # regenerate src/js/borders.js from Natural Earth
 - PRs auto-merge (squash) once CI and the "Linked ticket" check pass; drafts are not merged.
 - Versions exist only as git tags `vX.Y.Z`. Every merge to `main` tags the next patch;
   never edit version numbers in files. Minor/major releases: Actions -> Release.
-- Merging to `main` deploys to GitHub Pages automatically (Deploy workflow).
+- Merging to `main` deploys to GitHub Pages and to
+  https://wetter.krisperapps.de/ automatically (Deploy workflow).
 - Details: CONTRIBUTING.md.
