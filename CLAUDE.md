@@ -22,8 +22,10 @@ npm run borders        # regenerate src/js/borders.js from Natural Earth
 - `app.test.js` runs the whole app in headless Chrome with every service answered
   from `test/fixtures.js` (offline); it skips when no Chrome is found (`CHROME=path`).
 - CI (`deploy.yml`, workflow "Deploy"): `check` on every push/PR; on `main` "Version
-  tag", then `site` stamps the commit into `src/sw.js` and "krisperapps.de" publishes
-  `src/` and curls the live site, including that `sw.js` carries the commit.
+  tag", then `site` stamps the commit into `src/sw.js` and the version tag into
+  `src/index.html` (placeholder `dev`, shown below the 7 days) and "krisperapps.de"
+  publishes `src/` and curls the live site, including that `sw.js` carries the commit
+  and `index.html` the version.
 - Layout check before PRs: small (375x667) and large (412x915) phone in the device
   toolbar; nothing may scroll or overflow.
 

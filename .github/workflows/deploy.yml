@@ -3,7 +3,8 @@ name: Deploy
 # Lints and tests every push and pull request; pushes to main are then
 # published to https://wetter.krisperapps.de/ (src/) once the checks have passed.
 # There is no build step: the only change on the way out is stamping the
-# commit into the service worker, so each release gets a fresh app cache.
+# commit into the service worker, so each release gets a fresh app cache,
+# and the version tag into index.html, where the app shows it.
 
 on:
   push:
@@ -38,7 +39,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Stamp version
-        run: sed -i "s/__VERSION__/${GITHUB_SHA::8}/" src/sw.js
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          sed -i "s/__VERSION__/${GITHUB_SHA::8}/" src/sw.js
+          sed -i "s|<span id=\"version\">dev</span>|<span id=\"version\">${VERSION#v}</span>|" src/index.html
+          grep -q ">${VERSION#v}<" src/index.html
       - uses: actions/upload-artifact@v7
         with:
           name: site
@@ -71,7 +78,7 @@ jobs:
   # only write into this app's folder there; this job runs no code from the repo.
   server:
     name: krisperapps.de
-    needs: [site]
+    needs: [site, version]
     runs-on: ubuntu-latest
     concurrency:
       group: server
@@ -92,6 +99,8 @@ jobs:
           rsync -rtz --delete -e 'ssh -i ~/.ssh/deploy' _site/ deploy@krisperapps.de:./
 
       - name: Smoke test
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
           set -euo pipefail
           live="https://wetter.krisperapps.de/"
@@ -105,3 +114,4 @@ jobs:
             [ "$code" = 200 ] || { echo "::error::/$f returned $code"; exit 1; }
           done
           curl -s "${live}sw.js" | grep -q "'${GITHUB_SHA::8}'" || { echo "::error::sw.js is not stamped with this commit"; exit 1; }
+          curl -s "$live" | grep -q ">${VERSION#v}<" || { echo "::error::index.html is not stamped with ${VERSION}"; exit 1; }
