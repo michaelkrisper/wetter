@@ -1,7 +1,7 @@
 name: Deploy
 
 # Lints and tests every push and pull request; pushes to main are then
-# published to GitHub Pages (src/) once the checks have passed.
+# published to https://wetter.krisperapps.de/ (src/) once the checks have passed.
 # There is no build step: the only change on the way out is stamping the
 # commit into the service worker, so each release gets a fresh app cache.
 
@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: pages-${{ github.ref }}
+  group: deploy-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -30,42 +30,20 @@ jobs:
       - run: npm ci
       - run: npm run check
 
-  deploy:
+  site:
     # Only commits that got a version tag: a re-run of an older run deploys nothing.
     if: needs.version.outputs.version != ''
     needs: [check, version]
     runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.pages.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
       - name: Stamp version
         run: sed -i "s/__VERSION__/${GITHUB_SHA::8}/" src/sw.js
-      - uses: actions/configure-pages@v6
-      - uses: actions/upload-pages-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
+          name: site
           path: src
-      - id: pages
-        uses: actions/deploy-pages@v5
-
-      - name: Smoke test
-        run: |
-          set -euo pipefail
-          live="${{ steps.pages.outputs.page_url }}"
-          for f in "" sw.js manifest.webmanifest js/main.js icons/icon-192.png; do
-            for attempt in 1 2 3 4 5; do
-              code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$live$f" || echo 000)"
-              [ "$code" = 200 ] && break
-              sleep 5
-            done
-            echo "/$f -> $code"
-            [ "$code" = 200 ] || { echo "::error::/$f returned $code"; exit 1; }
-          done
-          curl -s "${live}sw.js" | grep -q "'${GITHUB_SHA::8}'" || { echo "::error::sw.js is not stamped with this commit"; exit 1; }
+          retention-days: 1
 
   # Tags every tested commit on main with the next patch version (vX.Y.Z).
   version:
@@ -89,11 +67,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-  # The same files on the own server (https://wetter.krisperapps.de/). The key may
+  # Publishes the site on the own server (https://wetter.krisperapps.de/). The key may
   # only write into this app's folder there; this job runs no code from the repo.
   server:
     name: krisperapps.de
-    needs: [deploy]
+    needs: [site]
     runs-on: ubuntu-latest
     concurrency:
       group: server
@@ -101,16 +79,29 @@ jobs:
     steps:
       - uses: actions/download-artifact@v8
         with:
-          name: github-pages
-          path: pages
+          name: site
+          path: _site
       - name: Upload
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
-          mkdir _site
-          tar -xf pages/artifact.tar -C _site
           install -m 700 -d ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy
           chmod 600 ~/.ssh/deploy
           echo 'krisperapps.de ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMchrlhQI1OFJ2cEfQosiydiSPg498c/+Mggebk+zVLO' > ~/.ssh/known_hosts
           rsync -rtz --delete -e 'ssh -i ~/.ssh/deploy' _site/ deploy@krisperapps.de:./
+
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          live="https://wetter.krisperapps.de/"
+          for f in "" sw.js manifest.webmanifest js/main.js icons/icon-192.png; do
+            for attempt in 1 2 3 4 5; do
+              code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$live$f" || echo 000)"
+              [ "$code" = 200 ] && break
+              sleep 5
+            done
+            echo "/$f -> $code"
+            [ "$code" = 200 ] || { echo "::error::/$f returned $code"; exit 1; }
+          done
+          curl -s "${live}sw.js" | grep -q "'${GITHUB_SHA::8}'" || { echo "::error::sw.js is not stamped with this commit"; exit 1; }

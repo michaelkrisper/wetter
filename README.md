@@ -8,9 +8,9 @@ together from several weather services into one continuous forecast.
 [![Version](https://img.shields.io/github/v/tag/michaelkrisper/wetter?sort=semver&label=version)](https://github.com/michaelkrisper/wetter/releases)
 [![Node.js](https://img.shields.io/badge/node-26-339933?logo=nodedotjs&logoColor=white)](.nvmrc)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Live demo](https://img.shields.io/badge/demo-michaelkrisper.github.io%2Fwetter-2ea44f)](https://michaelkrisper.github.io/wetter/)
+[![Live demo](https://img.shields.io/badge/demo-wetter.krisperapps.de-2ea44f)](https://wetter.krisperapps.de/)
 
-**Live demo: [michaelkrisper.github.io/wetter](https://michaelkrisper.github.io/wetter/)**
+**Live demo: [wetter.krisperapps.de](https://wetter.krisperapps.de/)**
 
 The user interface is in German.
 
@@ -84,7 +84,7 @@ All services are free and keyless. Data © their providers, see
 
 ## Install
 
-Open <https://michaelkrisper.github.io/wetter/> on your phone and add it to
+Open <https://wetter.krisperapps.de/> on your phone and add it to
 the home screen (Safari: *Share → Add to Home Screen*, Chrome: *Install app*).
 Allow location access to get the forecast for where you are; without it the
 app shows Graz.
@@ -95,7 +95,7 @@ There is no build step: `src/` is the app, served as-is.
 
 ```sh
 npm ci            # dev tools (Biome); Node.js 26, see .nvmrc
-npm run serve     # http://localhost:8080, gzip like GitHub Pages
+npm run serve     # http://localhost:8080, gzip like the live site
 npm test          # unit tests, plus the app in headless Chrome if installed
 npm run check     # what CI runs: lint, format check and tests
 npm run lint:fix  # format and fix
@@ -150,7 +150,7 @@ the [Open-Meteo model](https://open-meteo.com/en/docs) and the nowcast order.
 ## Deployment
 
 Every push and pull request runs lint and tests; pushes to `main` then publish
-`src/` to GitHub Pages via [GitHub Actions](.github/workflows/deploy.yml), but
+`src/` to <https://wetter.krisperapps.de/> via [GitHub Actions](.github/workflows/deploy.yml), but
 only if the checks passed. The workflow stamps the commit
 hash into `sw.js`, so installed apps pick up the new version on their next
 start, and finishes with a smoke test against the live site.
