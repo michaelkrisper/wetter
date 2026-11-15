@@ -4,7 +4,7 @@ Wetter: one-screen weather app (installable PWA) that stitches several free, key
 weather services into one continuous forecast: GeoSphere INCA nowcast and AROME for
 Austria and surroundings, Open-Meteo everywhere else, plus a rain radar tab. Vanilla
 JS ES modules, no framework, no build: `src/` is the app and is deployed as is to
-GitHub Pages (https://michaelkrisper.github.io/wetter/). UI German.
+the own server (https://wetter.krisperapps.de/). UI German.
 
 ## Commands
 
@@ -12,7 +12,7 @@ Node 26 (`.nvmrc`).
 
 ```sh
 npm ci                 # dev tools only (Biome)
-npm run serve          # src/ on http://localhost:8080 with gzip like Pages (PORT to change)
+npm run serve          # src/ on http://localhost:8080 with gzip like the live site (PORT to change)
 npm test               # node:test unit tests + test/app.test.js in headless Chrome
 npm run check          # lint + tests = CI job "check"
 npm run lint:fix       # Biome format and fix
@@ -22,8 +22,8 @@ npm run borders        # regenerate src/js/borders.js from Natural Earth
 - `app.test.js` runs the whole app in headless Chrome with every service answered
   from `test/fixtures.js` (offline); it skips when no Chrome is found (`CHROME=path`).
 - CI (`deploy.yml`, workflow "Deploy"): `check` on every push/PR; on `main` "Version
-  tag", then `deploy` stamps the commit into `src/sw.js`, publishes `src/` and curls
-  the live site, including that `sw.js` carries the commit.
+  tag", then `site` stamps the commit into `src/sw.js` and "krisperapps.de" publishes
+  `src/` and curls the live site, including that `sw.js` carries the commit.
 - Layout check before PRs: small (375x667) and large (412x915) phone in the device
   toolbar; nothing may scroll or overflow.
 
@@ -47,9 +47,10 @@ npm run borders        # regenerate src/js/borders.js from Natural Earth
 - One shell cache `wetter-<commit>`; the deploy replaces `__VERSION__` with the first
   8 characters of the commit SHA, so every deploy installs a fresh shell. It is not
   registered on localhost, so local reloads always show current files.
-- michaelkrisper.github.io is shared with other apps, and so is CacheStorage: activate
-  deletes only outdated `wetter-` caches (`test/sw.test.js`). Never delete caches by
-  any other pattern; that used to wipe the other apps' offline caches.
+- CacheStorage belongs to the origin, and an origin can be shared with other apps (it
+  was on michaelkrisper.github.io): activate deletes only outdated `wetter-` caches
+  (`test/sw.test.js`). Never delete caches by any other pattern; that used to wipe the
+  other apps' offline caches.
 
 ## Rules and pitfalls
 
@@ -91,6 +92,6 @@ npm run borders        # regenerate src/js/borders.js from Natural Earth
 - PRs auto-merge (squash) once CI and the "Linked ticket" check pass; drafts are not merged.
 - Versions exist only as git tags `vX.Y.Z`. Every merge to `main` tags the next patch;
   never edit version numbers in files. Minor/major releases: Actions -> Release.
-- Merging to `main` deploys to GitHub Pages and to
-  https://wetter.krisperapps.de/ automatically (Deploy workflow).
+- Merging to `main` deploys to https://wetter.krisperapps.de/ automatically (Deploy
+  workflow).
 - Details: CONTRIBUTING.md.
