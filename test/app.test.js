@@ -189,6 +189,8 @@ describe('app in a browser', { skip: !chrome && 'no Chrome found', timeout: 60_0
   it('shows Graz with seven distinct days and the week chart', async () => {
     assert.equal(await text('#place'), 'Graz');
     assert.match(await text('#temp'), /^-?\d+°$/);
+    // The deploy stamps the version tag over the placeholder.
+    assert.equal(await text('.version'), 'Version dev');
     const days = await evaluate(
       `[...document.querySelectorAll('#days li')].map((li) => li.textContent.trim().slice(0, 9))`,
     );

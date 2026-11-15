@@ -116,7 +116,7 @@ h2 {
 .view-weather {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
   gap: var(--gap);
   min-height: 0;
   padding: var(--top) 14px 4px;
@@ -714,6 +714,14 @@ h2 {
   border-radius: 50%;
   background: var(--text);
   box-shadow: 0 0 0 2px var(--card);
+}
+
+.version {
+  margin: -4px 0 0;
+  font-size: 10px;
+  line-height: 12px;
+  color: var(--faint);
+  text-align: center;
 }
 
 /* Tab bar at the bottom, in thumb reach */
