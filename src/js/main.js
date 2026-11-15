@@ -217,6 +217,10 @@ setInterval(() => {
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
 
+// The deploy stamps the bare number; shown as v1.2.3, unstamped it stays "dev".
+const version = $('version');
+if (version.textContent !== 'dev') version.textContent = `v${version.textContent}`;
+
 render();
 refresh();
 locate();
