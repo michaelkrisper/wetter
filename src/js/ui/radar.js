@@ -122,7 +122,7 @@ export function createRadar(root) {
   <button class="map-btn" id="radar-play" aria-label="Abspielen">${glyph('play')}</button>
   <div class="rt" id="radar-timeline" role="slider" aria-label="Zeitpunkt" tabindex="0">
     <div class="rt-ticks"></div>
-    <div class="rt-labels"><span>−2 h</span><span class="rt-now">jetzt</span><span id="radar-end"></span></div>
+    <div class="rt-labels"><span id="radar-start"></span><span class="rt-now">jetzt</span><span id="radar-end"></span></div>
   </div>
 </div>
 <p class="map-credits">Radar <a href="https://www.rainviewer.com">RainViewer</a> · Vorhersage <a href="https://data.hub.geosphere.at">GeoSphere</a>, <a href="https://open-meteo.com">Open-Meteo</a> · Karte © <a href="https://www.esri.com">Esri</a>, HERE, Garmin, © OpenStreetMap, <a href="https://basemap.at">basemap.at</a></p>`;
@@ -269,11 +269,9 @@ export function createRadar(root) {
       })
       .join('');
     const last = frames.at(-1);
-    const ahead = last?.canvas ? Math.round((last.time - Date.now()) / 60_000) : 0;
-    $('#radar-end').textContent =
-      ahead > 0
-        ? `+${ahead >= 90 ? `${Math.round(ahead / 30) / 2} h`.replace('.', ',') : `${ahead} min`}`
-        : '';
+    $('#radar-start').textContent = frames.length > 1 ? clock(frames[0].time, timezone) : '';
+    // Without a forecast the timeline ends at "jetzt".
+    $('#radar-end').textContent = last?.canvas ? clock(last.time, timezone) : '';
     $('.rt-now').style.left = `${frames.length > 1 ? (nowIndex / (frames.length - 1)) * 100 : 100}%`;
     timeline.setAttribute('aria-valuemax', String(frames.length - 1));
   }
