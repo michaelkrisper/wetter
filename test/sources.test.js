@@ -74,7 +74,11 @@ describe('fetchInca', () => {
 describe('fetchRadarForecast', () => {
   it('uses a coarse Open-Meteo grid outside the INCA domain', async (t) => {
     const calls = mockFetch(t, (url) => radarGridResponse(url));
-    const grid = await fetchRadarForecast(EDINBURGH.lat, EDINBURGH.lon);
+    const grids = [];
+    await fetchRadarForecast(EDINBURGH.lat, EDINBURGH.lon, (grid) => grids.push(grid));
+    const [grid] = grids;
+    assert.equal(grids.length, 1);
+    assert.equal(grid.source, 'model');
     assert.equal(calls.length, 1);
     assert.equal(calls[0].host, 'api.open-meteo.com');
     assert.equal(grid.nx, 15);
@@ -89,5 +93,23 @@ describe('fetchRadarForecast', () => {
     // 15-minute sums become mm/h.
     const frame = grid.frames.at(-1);
     assert.ok(Math.abs(frame.rates[0] - 1.2 * 4) < 1e-6);
+  });
+
+  it('shows the model without waiting for the INCA grid', async (t) => {
+    const inca = Promise.withResolvers();
+    mockFetch(t, (url) => (url.host === 'api.open-meteo.com' ? radarGridResponse(url) : inca.promise));
+    const grids = [];
+    const done = fetchRadarForecast(GRAZ.lat, GRAZ.lon, (grid) => grids.push(grid));
+    await t.waitFor(() => assert.equal(grids.length, 1));
+    assert.equal(grids[0].source, 'model');
+    // INCA fails in the end: the model stays and that is not an error.
+    inca.resolve(new Response('', { status: 503 }));
+    await done;
+    assert.equal(grids.length, 1);
+  });
+
+  it('fails when neither INCA nor the model answer', async (t) => {
+    mockFetch(t, () => new Response('', { status: 503 }));
+    await assert.rejects(fetchRadarForecast(GRAZ.lat, GRAZ.lon, () => assert.fail('nothing to show')));
   });
 });

@@ -16,6 +16,7 @@ const FRAME_MS = 500; // crossfade from one frame to the next
 const HOLD_MS = { now: 400, end: 1100 }; // rest on the latest radar image and at the end
 const PAST_TTL = 5 * 60_000;
 const FORECAST_TTL = 10 * 60_000;
+const INCA_KEEP = 30 * 60_000;
 const DOUBLE_TAP_MS = 300;
 
 const dpr = Math.min(2, devicePixelRatio || 1);
@@ -122,7 +123,7 @@ export function createRadar(root) {
   let center = null; // normalised Mercator
   let past = [];
   let host = '';
-  let forecast = null; // { grid, frames: [{ time, canvas }] }
+  let forecast = null; // { grid, frames: [{ time, canvas, dry }] }
   let frames = [];
   let frame = 0; // the frame named in the header: the one nearest to `pos`
   let pos = 0; // playback position; between two frames they are blended
@@ -325,24 +326,33 @@ export function createRadar(root) {
     if (forecastLoading?.key === key) return forecastLoading;
     if (key === forecastKey && Date.now() - forecastAt < FORECAST_TTL) return Promise.resolve();
     if (!forecast) $('#radar-end').textContent = 'lädt …';
+    const show = (grid) => {
+      if (forecastLoading !== loading) return; // another place by now
+      // On a refresh the coarse model does not replace a recent INCA picture
+      // for the seconds or minutes until the new one arrives.
+      const recentInca =
+        forecast?.grid.source === 'inca' && key === forecastKey && Date.now() - forecastAt < INCA_KEEP;
+      if (grid.source === 'model' && recentInca) return;
+      forecast = {
+        grid,
+        frames: grid.frames.map((f) => ({
+          time: f.time,
+          canvas: frameCanvas(grid, f.rates),
+          dry: !f.rates.some((rate) => rate >= RAMP[0][0]),
+        })),
+      };
+      forecastAt = Date.now();
+      forecastKey = key;
+      rebuildFrames();
+    };
     const loading = (async () => {
       try {
-        const grid = await fetchRadarForecast(place.lat, place.lon);
-        forecast = {
-          grid,
-          frames: grid.frames.map((f) => ({
-            time: f.time,
-            canvas: frameCanvas(grid, f.rates),
-            dry: !f.rates.some((rate) => rate >= RAMP[0][0]),
-          })),
-        };
-        forecastAt = Date.now();
-        forecastKey = key;
+        await fetchRadarForecast(place.lat, place.lon, show);
       } catch (error) {
         console.warn('Radar forecast:', error);
+        rebuildFrames();
       }
       if (forecastLoading === loading) forecastLoading = null;
-      rebuildFrames();
     })();
     loading.key = key;
     forecastLoading = loading;
