@@ -1,9 +1,11 @@
 // Rain radar tab, loaded on first use: the last two hours of RainViewer's
 // global radar composite, followed by a forecast for the next hours (INCA
-// around Austria, model data elsewhere), over Esri's dark grey basemap.
+// around Austria, model data elsewhere), over Esri's dark grey basemap and,
+// within Austria, the far more detailed basemap.at.
 // A small tile renderer of its own instead of a map library: pinch, wheel or
 // double tap to zoom, drag to pan.
 
+import { BORDERS } from '../borders.js';
 import { fetchRadarForecast } from '../sources/radar-grid.js';
 import { clock } from './format.js';
 import { glyph } from './icons.js';
@@ -24,11 +26,24 @@ const dpr = Math.min(2, devicePixelRatio || 1);
 const baseUrl = (layer, z, x, y) =>
   `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/${layer}/MapServer/tile/${z}/${y}/${x}`;
 
+// basemap.at (CC BY 4.0, no key): 512 px tiles for high-density screens, Austria
+// only and white beyond the border, where the tiles of the bounding box end too.
+const detailUrl = (z, x, y) =>
+  `https://mapsneu.wien.gv.at/basemap/bmaphidpi/normal/google3857/${z}/${y}/${x}.jpeg`;
+
 // Web Mercator, normalised to 0..1.
 function project(lat, lon) {
   const sin = Math.sin((lat * Math.PI) / 180);
   return { x: (lon + 180) / 360, y: 0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI) };
 }
+
+const AUSTRIA = BORDERS.at.map((ring) => ring.map(([lat, lon]) => project(lat, lon)));
+const AUSTRIA_BOX = {
+  x0: Math.min(...AUSTRIA.flat().map((p) => p.x)),
+  x1: Math.max(...AUSTRIA.flat().map((p) => p.x)),
+  y0: Math.min(...AUSTRIA.flat().map((p) => p.y)),
+  y1: Math.max(...AUSTRIA.flat().map((p) => p.y)),
+};
 
 // Forecast colours by intensity (mm/h), close to RainViewer's palette.
 const RAMP = [
@@ -69,12 +84,15 @@ function frameCanvas({ nx, ny }, rates) {
   return canvas;
 }
 
-function tilesHtml(z, size, left, top, w, h, url) {
+// `box` (normalised Mercator) leaves out the tiles that lie outside of it.
+function tilesHtml(z, size, left, top, w, h, url, box) {
   const count = 2 ** z;
   let html = '';
   for (let ty = Math.floor(top / size); ty * size < top + h; ty++) {
     if (ty < 0 || ty >= count) continue;
+    if (box && (ty + 1 < box.y0 * count || ty > box.y1 * count)) continue;
     for (let tx = Math.floor(left / size); tx * size < left + w; tx++) {
+      if (box && (tx + 1 < box.x0 * count || tx > box.x1 * count)) continue;
       const wrapped = ((tx % count) + count) % count;
       html += `<img src="${url(z, wrapped, ty)}" style="left:${(tx * size - left).toFixed(1)}px;top:${(ty * size - top).toFixed(1)}px;width:${size.toFixed(1)}px;height:${size.toFixed(1)}px" alt="" draggable="false" onerror="this.remove()">`;
     }
@@ -87,6 +105,7 @@ export function createRadar(root) {
 <div class="map" id="map">
   <div class="map-pan">
     <div class="map-layer" data-layer="base"></div>
+    <div class="map-layer map-detail" data-layer="detail"></div>
     <div class="map-layer map-radar" data-layer="radar"></div>
     <canvas class="map-layer map-forecast"></canvas>
     <div class="map-layer" data-layer="labels"></div>
@@ -106,7 +125,7 @@ export function createRadar(root) {
     <div class="rt-labels"><span>−2 h</span><span class="rt-now">jetzt</span><span id="radar-end"></span></div>
   </div>
 </div>
-<p class="map-credits">Radar <a href="https://www.rainviewer.com">RainViewer</a> · Vorhersage <a href="https://data.hub.geosphere.at">GeoSphere</a>, <a href="https://open-meteo.com">Open-Meteo</a> · Karte © <a href="https://www.esri.com">Esri</a>, HERE, Garmin, © OpenStreetMap</p>`;
+<p class="map-credits">Radar <a href="https://www.rainviewer.com">RainViewer</a> · Vorhersage <a href="https://data.hub.geosphere.at">GeoSphere</a>, <a href="https://open-meteo.com">Open-Meteo</a> · Karte © <a href="https://www.esri.com">Esri</a>, HERE, Garmin, © OpenStreetMap, <a href="https://basemap.at">basemap.at</a></p>`;
 
   const $ = (selector) => root.querySelector(selector);
   const map = $('#map');
@@ -211,6 +230,17 @@ export function createRadar(root) {
     layer('labels').innerHTML = tilesHtml(tz, world / 2 ** tz, left, top, w, h, (z, x, y) =>
       baseUrl('World_Dark_Gray_Reference', z, x, y),
     );
+    layer('detail').innerHTML = tilesHtml(tz, world / 2 ** tz, left, top, w, h, detailUrl, AUSTRIA_BOX);
+    // basemap.at brings its own, sharper labels: Esri's are cut out within
+    // Austria. The outline is coarse, which only shows right at the border.
+    const outline = AUSTRIA.map(
+      (ring) =>
+        `M${ring.map((p) => `${(p.x * world - left).toFixed(1)},${(p.y * world - top).toFixed(1)}`).join('L')}Z`,
+    ).join('');
+    // The frame around it reaches beyond the screen for the gesture previews.
+    const far = 4 * Math.max(w, h);
+    layer('labels').style.clipPath =
+      `path(evenodd, "M${-far},${-far}H${w + far}V${h + far}H${-far}Z${outline}")`;
     const rz = Math.min(tz, RADAR_MAX_ZOOM);
     layer('radar').innerHTML = past
       .map(

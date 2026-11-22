@@ -74,7 +74,9 @@ npm run borders        # regenerate src/js/borders.js from Natural Earth
   requests use a 4 s timeout with retry.
 - INCA `pt`: only 1 (rain) and 255 (none) are verified; otherwise temperature decides.
 - Basemap: CARTO without key serves "API KEY REQUIRED" tiles and
-  tile.openstreetmap.org blocks apps (418), hence Esri World Dark Gray. RainViewer's
+  tile.openstreetmap.org blocks apps (418), hence Esri World Dark Gray, with basemap.at's
+  high-resolution tiles (Austria only, light: inverted and blended with `lighten`) on
+  top; Esri's labels are cut out within Austria. RainViewer's
   free tiles stop at zoom 7 (upscaled beyond), have no forecast frames and ignore the
   colour scheme; forecast frames come from the INCA grid (Open-Meteo grid elsewhere).
 - `.map-pan` needs `transform-origin: 0 0`, otherwise pinch zoom drifts to a corner.
