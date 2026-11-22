@@ -12,6 +12,8 @@ import { getJson, query } from './http.js';
 const INCA_GRID = 'https://dataset.api.hub.geosphere.at/v1/grid/forecast/nowcast-v1-15min-1km';
 const OPEN_METEO = 'https://api.open-meteo.com/v1/forecast';
 const MINUTE = 60_000;
+// The grid takes 3-90 s and concurrent requests stall each other.
+const INCA_TIMEOUT_MS = 90_000;
 // Area around the location, in km from the centre. Each Open-Meteo grid point
 // counts as one API call, so the model grid is kept small.
 const RADIUS_KM = 150;
@@ -29,7 +31,7 @@ async function fetchInca(lat, lon) {
   const bbox = [Math.max(s, S), Math.max(w, W), Math.min(n, N), Math.min(e, E)].map((v) => v.toFixed(3));
   const url = `${INCA_GRID}?${query({ parameters: 'rr', bbox: bbox.join(','), output_format: 'netcdf' })}`;
   const [res, { File }] = await Promise.all([
-    fetch(url, { signal: AbortSignal.timeout(30_000) }),
+    fetch(url, { signal: AbortSignal.timeout(INCA_TIMEOUT_MS) }),
     import('../../vendor/jsfive/hdf5.js'),
   ]);
   if (!res.ok) throw new Error(`INCA grid: HTTP ${res.status}`);
@@ -49,6 +51,7 @@ async function fetchInca(lat, lon) {
     return { time: base + minutes * MINUTE, rates };
   });
   return {
+    source: 'inca',
     nx,
     ny,
     // Grid corners: first cell, last cell of the first row, first cell of the last row.
@@ -86,6 +89,7 @@ async function fetchModel(lat, lon) {
     rates: Float32Array.from(points, (p) => (p.minutely_15.precipitation[t] ?? 0) * 4),
   }));
   return {
+    source: 'model',
     nx: MODEL_POINTS,
     ny: MODEL_POINTS,
     corners: [
@@ -97,18 +101,22 @@ async function fetchModel(lat, lon) {
   };
 }
 
-// Frames from now on; INCA where it covers the location, the model elsewhere
-// or when INCA does not answer.
-export async function fetchRadarForecast(lat, lon) {
-  const now = Date.now();
-  let grid = null;
-  if (inBox(lat, lon, INCA_BOX)) {
-    try {
-      grid = await fetchInca(lat, lon);
-    } catch (error) {
-      console.warn('INCA grid:', error);
-    }
+// Frames from now on, handed to `show`: the model, which answers in a moment,
+// and where INCA covers the location its grid as soon as it has arrived (the
+// model is skipped if INCA was faster). Rejects when there is nothing to show.
+export async function fetchRadarForecast(lat, lon, show) {
+  const future = (grid) => ({ ...grid, frames: grid.frames.filter((f) => f.time > Date.now()) });
+  const model = fetchModel(lat, lon).then(future);
+  if (!inBox(lat, lon, INCA_BOX)) return show(await model);
+  let arrived = false;
+  const early = model.then((grid) => arrived || show(grid));
+  early.catch(() => {}); // reported below, unless INCA makes up for it
+  try {
+    const grid = future(await fetchInca(lat, lon));
+    arrived = true;
+    show(grid);
+  } catch (error) {
+    console.warn('INCA grid:', error);
+    await early;
   }
-  grid ??= await fetchModel(lat, lon);
-  return { ...grid, frames: grid.frames.filter((f) => f.time > now) };
 }
