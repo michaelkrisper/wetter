@@ -953,6 +953,13 @@ circle.i-sun {
   pointer-events: none;
 }
 
+/* basemap.at is a light map: inverted, its white beyond the border turns black
+   and "lighten" lets Esri's grey show there, and as the ground within Austria. */
+.map-detail {
+  filter: invert(1) hue-rotate(180deg) saturate(0.45) brightness(1.25);
+  mix-blend-mode: lighten;
+}
+
 .map-radar {
   opacity: 0.8;
 }

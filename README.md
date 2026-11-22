@@ -174,6 +174,8 @@ Release workflow (see [CONTRIBUTING](CONTRIBUTING.md#versions-and-releases)).
 - [RainViewer](https://www.rainviewer.com): radar tiles
 - [Esri](https://www.esri.com): dark grey basemap (Esri, HERE, Garmin,
   © OpenStreetMap contributors)
+- [basemap.at](https://basemap.at): detailed high-resolution map within Austria,
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 - [OpenStreetMap Nominatim](https://nominatim.openstreetmap.org): place names,
   [ODbL](https://www.openstreetmap.org/copyright)
 - [Natural Earth](https://www.naturalearthdata.com): country borders, public domain
