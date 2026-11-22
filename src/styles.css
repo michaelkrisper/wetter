@@ -957,12 +957,10 @@ circle.i-sun {
   opacity: 0.8;
 }
 
+/* Frames are blended by adding their shares up (see drawForecast in radar.js). */
 .map-frame {
   opacity: 0;
-}
-
-.map-frame.is-active {
-  opacity: 1;
+  mix-blend-mode: plus-lighter;
 }
 
 .map-me {

@@ -12,8 +12,8 @@ const INDEX_URL = 'https://api.rainviewer.com/public/weather-maps.json';
 const RADAR_MAX_ZOOM = 7; // RainViewer's free tiles stop here; higher zooms upscale.
 const ZOOM = { min: 4, max: 12, start: 8 };
 const TILE = 256;
-const FRAME_MS = 500;
-const HOLD_MS = { now: 900, end: 1600 };
+const FRAME_MS = 500; // crossfade from one frame to the next
+const HOLD_MS = { now: 400, end: 1100 }; // rest on the latest radar image and at the end
 const PAST_TTL = 5 * 60_000;
 const FORECAST_TTL = 10 * 60_000;
 const DOUBLE_TAP_MS = 300;
@@ -124,12 +124,14 @@ export function createRadar(root) {
   let host = '';
   let forecast = null; // { grid, frames: [{ time, canvas }] }
   let frames = [];
-  let frame = 0;
+  let frame = 0; // the frame named in the header: the one nearest to `pos`
+  let pos = 0; // playback position; between two frames they are blended
+  let labelled = null;
   let pastAt = 0;
   let forecastAt = 0;
   let forecastKey = '';
   let forecastLoading = null;
-  let timer = 0;
+  let raf = 0;
   let playing = false;
   let visible = false;
   let size = { w: 0, h: 0 };
@@ -140,12 +142,19 @@ export function createRadar(root) {
     y: (y - center.y) * worldSize() + size.h / 2,
   });
 
+  // Share of a frame in the picture at `pos`.
+  function weight(f) {
+    const i = Math.floor(pos);
+    return f === frames[i] ? 1 - (pos - i) : f === frames[i + 1] ? pos - i : 0;
+  }
+
   function drawForecast() {
     const ctx = canvas.getContext('2d');
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const f = frames[frame];
-    if (!f?.canvas || !forecast) return;
+    const i = Math.floor(pos);
+    const shown = forecast ? [frames[i], frames[i + 1]].filter((f) => f?.canvas && weight(f) > 0) : [];
+    if (!shown.length) return;
     const { nx, ny, corners } = forecast.grid;
     const [p0, p1, p2] = corners.map(([lat, lon]) => toScreen(project(lat, lon)));
     // Affine map from grid cells to the screen; over a few hundred kilometres
@@ -164,12 +173,23 @@ export function createRadar(root) {
     );
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(f.canvas, 0, 0);
+    // Added up, the two shares give an exact blend; drawn over each other, rain
+    // in both frames would turn paler halfway.
+    ctx.globalCompositeOperation = 'lighter';
+    let alpha = 0;
+    for (const f of shown) {
+      ctx.globalAlpha = weight(f);
+      ctx.drawImage(f.canvas, 0, 0);
+      alpha += weight(f);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = Math.min(1, alpha);
     // Outside this area there is no forecast; outline it so empty is not mistaken for dry.
     ctx.strokeStyle = 'rgb(255 255 255 / 0.25)';
     ctx.lineWidth = 1 / Math.hypot(a, b);
     ctx.setLineDash([4 / Math.hypot(a, b), 4 / Math.hypot(a, b)]);
     ctx.strokeRect(0, 0, nx, ny);
+    ctx.globalAlpha = 1;
   }
 
   function layout() {
@@ -194,7 +214,7 @@ export function createRadar(root) {
     layer('radar').innerHTML = past
       .map(
         (f, i) =>
-          `<div class="map-frame${frames[frame] === f ? ' is-active' : ''}" data-frame="${i}">${tilesHtml(rz, world / 2 ** rz, left, top, w, h, (z, x, y) => `${host}${f.path}/256/${z}/${x}/${y}/2/1_1.png`)}</div>`,
+          `<div class="map-frame" style="opacity:${weight(f)}" data-frame="${i}">${tilesHtml(rz, world / 2 ** rz, left, top, w, h, (z, x, y) => `${host}${f.path}/256/${z}/${x}/${y}/2/1_1.png`)}</div>`,
       )
       .join('');
 
@@ -209,6 +229,7 @@ export function createRadar(root) {
   }
 
   function renderTimeline() {
+    labelled = null;
     const nowIndex = past.length - 1;
     $('.rt-ticks').innerHTML = frames
       .map((f, i) => {
@@ -226,13 +247,17 @@ export function createRadar(root) {
     timeline.setAttribute('aria-valuemax', String(frames.length - 1));
   }
 
-  function showFrame(index) {
-    frame = Math.max(0, Math.min(frames.length - 1, index));
-    const f = frames[frame];
+  // `position` may lie between two frames, which are then blended.
+  function showFrame(position) {
+    pos = Math.max(0, Math.min(frames.length - 1, position));
     for (const el of layer('radar').querySelectorAll('.map-frame')) {
-      el.classList.toggle('is-active', past[Number(el.dataset.frame)] === f);
+      el.style.opacity = weight(past[Number(el.dataset.frame)]);
     }
     drawForecast();
+    const f = frames[Math.round(pos)];
+    if (frame === Math.round(pos) && labelled === f) return;
+    frame = Math.round(pos);
+    labelled = f;
     for (const [i, tick] of [...$('.rt-ticks').children].entries())
       tick.classList.toggle('is-active', i === frame);
     timeline.setAttribute('aria-valuenow', String(frame));
@@ -258,18 +283,26 @@ export function createRadar(root) {
 
   function play(on) {
     playing = on && frames.length > 1;
-    clearTimeout(timer);
+    cancelAnimationFrame(raf);
     playButton.innerHTML = glyph(playing ? 'pause' : 'play');
     playButton.setAttribute('aria-label', playing ? 'Anhalten' : 'Abspielen');
-    if (!playing) return;
-    const delay = (i) =>
-      i === frames.length - 1 ? HOLD_MS.end : i === past.length - 1 ? HOLD_MS.now : FRAME_MS;
-    const tick = () => {
-      const next = (frame + 1) % frames.length;
-      showFrame(next);
-      timer = setTimeout(tick, delay(next));
+    // Paused between two frames would leave a double image.
+    if (!playing) return showFrame(frame);
+    let last = performance.now();
+    let holdUntil = 0;
+    const step = (now) => {
+      raf = requestAnimationFrame(step);
+      // A tab in the background gets no frames; do not leap ahead afterwards.
+      const dt = Math.max(0, Math.min(100, now - last));
+      last = now;
+      if (now < holdUntil) return;
+      const end = frames.length - 1;
+      if (pos >= end) return showFrame(0);
+      const stop = pos < past.length - 1 ? past.length - 1 : end;
+      showFrame(Math.min(stop, pos + dt / FRAME_MS));
+      if (pos === stop) holdUntil = now + (stop === end ? HOLD_MS.end : HOLD_MS.now);
     };
-    timer = setTimeout(tick, delay(frame));
+    raf = requestAnimationFrame(step);
   }
 
   async function loadPast() {
