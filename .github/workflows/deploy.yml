@@ -113,5 +113,7 @@ jobs:
             echo "/$f -> $code"
             [ "$code" = 200 ] || { echo "::error::/$f returned $code"; exit 1; }
           done
-          curl -s "${live}sw.js" | grep -q "'${GITHUB_SHA::8}'" || { echo "::error::sw.js is not stamped with this commit"; exit 1; }
-          curl -s "$live" | grep -q ">${VERSION#v}<" || { echo "::error::index.html is not stamped with ${VERSION}"; exit 1; }
+          # Not grep -q: it stops at the first match, curl then fails to write the
+          # rest and pipefail turns that into a failed check.
+          curl -s "${live}sw.js" | grep "'${GITHUB_SHA::8}'" > /dev/null || { echo "::error::sw.js is not stamped with this commit"; exit 1; }
+          curl -s "$live" | grep ">${VERSION#v}<" > /dev/null || { echo "::error::index.html is not stamped with ${VERSION}"; exit 1; }
