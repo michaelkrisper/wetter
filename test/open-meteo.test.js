@@ -49,6 +49,16 @@ describe('fetchOpenMeteo', () => {
     assert.equal(daily[2].time - daily[1].time, 25 * HOUR);
   });
 
+  it('brings the zone offsets for formatting without Intl, with the change from summer time', async (t) => {
+    mockFetch(t, () => openMeteoResponse({ now: BEFORE_DST, model: MODEL }));
+    const { offsets, daily } = await fetchOpenMeteo(GRAZ.lat, GRAZ.lon, MODEL);
+    assert.deepEqual(offsets, [
+      [daily[0].time - 24 * HOUR, 2 * HOUR],
+      [Date.parse('2026-10-25T01:00:00Z'), HOUR],
+      [daily.at(-1).time + 3 * 24 * HOUR, null],
+    ]);
+  });
+
   it('lets the regional model win where it has data', async (t) => {
     mockFetch(t, () => openMeteoResponse({ now: BEFORE_DST, model: MODEL }));
     const { hourly, model } = await fetchOpenMeteo(GRAZ.lat, GRAZ.lon, MODEL);

@@ -66,13 +66,17 @@ function fromModel(minutely) {
   };
 }
 
+// Of the stored forecast; an older one is dropped at start. 2: zone offsets.
+export const VERSION = 2;
+
 function assemble({ lat, lon }, region, model, nowcast) {
   return {
-    version: 1,
+    version: VERSION,
     fetchedAt: Date.now(),
     location: { lat, lon },
     region: region.id,
     timezone: model.timezone,
+    offsets: model.offsets,
     model: model.model,
     current: model.current,
     nowcast,

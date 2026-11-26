@@ -207,6 +207,8 @@ describe('app in a browser', { skip: !chrome && 'no Chrome found', timeout: 60_0
         `!!document.querySelector('#c-night') && document.querySelectorAll('.c-star').length > 0`,
       ),
     );
+    // The chart's animations start once the forecast is in and the page is idle.
+    await waitFor(`document.getElementById('chart').classList.contains('is-animated')`);
   });
 
   it('quotes the same rain in the outlook, the chart and the day', async () => {

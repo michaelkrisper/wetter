@@ -83,19 +83,49 @@ function series(block, name, model, useRegional = REGIONAL.has(name)) {
 
 const ms = (unix) => (unix == null ? null : unix * 1000);
 
+const DAY = 86_400_000;
+const QUARTER = 15 * 60_000;
+const formatters = new Map();
+
 // UTC offset of a time zone at an instant, in ms.
 function zoneOffset(time, timeZone) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-  }).formatToParts(time);
-  const v = Object.fromEntries(parts.map((p) => [p.type, Number(p.value)]));
+  let formatter = formatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+    });
+    formatters.set(timeZone, formatter);
+  }
+  const v = Object.fromEntries(formatter.formatToParts(time).map((p) => [p.type, Number(p.value)]));
   return Date.UTC(v.year, v.month - 1, v.day, v.hour, v.minute) - (time - (time % 60_000));
+}
+
+// The zone's offsets from `from` until `until` as [[from, offset], ..., [until, null]],
+// so the app can format times without Intl (ui/format.js). Sampled daily; a
+// change in between is narrowed down to the quarter hour it happens at.
+export function zoneOffsets(from, until, timeZone) {
+  const offsets = [[from, zoneOffset(from, timeZone)]];
+  for (let t = from + DAY; t < until + DAY; t += DAY) {
+    const end = Math.min(t, until);
+    const offset = zoneOffset(end, timeZone);
+    if (offset === offsets.at(-1)[1]) continue;
+    let lo = end - DAY;
+    let hi = end;
+    while (hi - lo > QUARTER) {
+      const mid = lo + Math.floor((hi - lo) / 2 / QUARTER) * QUARTER;
+      if (zoneOffset(mid, timeZone) === offset) hi = mid;
+      else lo = mid;
+    }
+    offsets.push([hi, offset]);
+  }
+  offsets.push([until, null]);
+  return offsets;
 }
 
 function normalize(data, model) {
@@ -170,6 +200,9 @@ function normalize(data, model) {
 
   return {
     timezone: data.timezone,
+    // From the day before the first until two days after the last, so a
+    // forecast shown a while later is still covered.
+    offsets: zoneOffsets(starts[0] - DAY, starts.at(-1) + 3 * DAY, data.timezone),
     model: model && covered.size > 0 ? model : null,
     current: {
       time: ms(c.time),
