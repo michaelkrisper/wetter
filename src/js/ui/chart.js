@@ -235,8 +235,10 @@ function windSvg(sky, x, timezone) {
 }
 
 // Scattered by a fixed hash of the time, so the stars stay put across redraws.
+// Dots of zero-length strokes with round caps, one path per size and
+// brightness: hundreds of single circles made every redraw much slower.
 function starsSvg(daylight, from, until, x, top, bottom, sky = []) {
-  let svg = '';
+  const paths = new Map();
   for (const [a, b] of nights(daylight, from, until)) {
     const start = a + TWILIGHT;
     const end = b - TWILIGHT;
@@ -255,8 +257,16 @@ function starsSvg(daylight, from, until, x, top, bottom, sky = []) {
       }).cloud;
       const clear = 1 - ((cover ?? 0) / 100) * 0.9;
       const cy = top + r2 ** 1.6 * (bottom - top);
-      svg += `<circle class="c-star" cx="${f1(cx)}" cy="${f1(cy)}" r="${(0.5 + r3 * 0.7).toFixed(2)}" opacity="${((0.25 + r3 * 0.55) * clear).toFixed(2)}"/>`;
+      const size = (Math.round((0.5 + r3 * 0.7) * 5) / 2.5).toFixed(1);
+      const opacity = Math.round((0.25 + r3 * 0.55) * clear * 20) / 20;
+      if (!opacity) continue;
+      append(paths, `${size} ${opacity}`, `M${f1(cx)} ${f1(cy)}h0`);
     }
+  }
+  let svg = '';
+  for (const [key, d] of paths) {
+    const [size, opacity] = key.split(' ');
+    svg += `<path class="c-star" d="${d}" stroke-width="${size}" opacity="${opacity}"/>`;
   }
   return svg;
 }

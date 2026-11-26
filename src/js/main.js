@@ -1,10 +1,10 @@
 import { DEFAULT_LOCATION, MOVE_THRESHOLD_KM, REFRESH_MS } from './config.js';
-import { loadForecast, requestsFor } from './forecast.js';
+import { loadForecast, requestsFor, VERSION } from './forecast.js';
 import { distanceKm, getPosition, placeName } from './location.js';
 import { snapshot } from './model.js';
 import * as storage from './storage.js';
 import { createChart } from './ui/chart.js';
-import { clock } from './ui/format.js';
+import { clock, setOffsets } from './ui/format.js';
 import { createPicker } from './ui/picker.js';
 import { renderChartHead, renderDays, renderHero } from './ui/render.js';
 
@@ -21,7 +21,9 @@ let radar = null;
 let point = null;
 let day = null;
 
-if (forecast?.version !== 1 || distanceKm(forecast.location, place) > MOVE_THRESHOLD_KM) forecast = null;
+if (forecast?.version !== VERSION || distanceKm(forecast.location, place) > MOVE_THRESHOLD_KM)
+  forecast = null;
+else setOffsets(forecast.timezone, forecast.offsets);
 
 const chart = createChart($('chart'), {
   onSelect(next) {
@@ -75,13 +77,22 @@ async function refresh() {
     if (id !== request) return false;
     forecast = next;
     failed = false;
+    setOffsets(forecast.timezone, forecast.offsets);
     storage.set('forecast', forecast);
     return true;
   };
+  // The final forecast differs from the partial one only in its nowcast; when
+  // that is the one already drawn, the screen stays as it is.
+  let drawn = null;
   try {
     const next = await loadForecast(place, {
       previous: forecast,
-      onPartial: (partial) => accept(partial) && render(),
+      onPartial: (partial) => {
+        if (!accept(partial)) return;
+        render();
+        drawn = partial.nowcast;
+        started();
+      },
     });
     if (!accept(next)) return;
   } catch (error) {
@@ -90,7 +101,10 @@ async function refresh() {
     failed = true;
   }
   loading = false;
-  render();
+  const same =
+    !failed && drawn?.provider === forecast.nowcast.provider && drawn.issued === forecast.nowcast.issued;
+  if (same) renderStatus();
+  else render();
   started();
 }
 
@@ -100,13 +114,14 @@ const idle = (fn) =>
 const hasWorker = 'serviceWorker' in navigator && !['localhost', '127.0.0.1'].includes(location.hostname);
 
 // What the first forecast does not need waits until it is on screen (or the
-// request failed) and the page is idle: the service worker's install fetches
-// the whole shell.
+// request failed) and the page is idle: the chart's animations, which repaint
+// it every frame, and the service worker, whose install fetches the whole shell.
 let isStarted = false;
 function started() {
   if (isStarted) return;
   isStarted = true;
   idle(() => {
+    $('chart').classList.add('is-animated');
     if (hasWorker) navigator.serviceWorker.register('./sw.js');
   });
 }

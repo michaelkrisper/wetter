@@ -4,7 +4,18 @@ import { distanceKm } from '../src/js/location.js';
 import { inBox, regionFor } from '../src/js/regions.js';
 import { INCA_BOX } from '../src/js/sources/geosphere.js';
 import { rainScale, tempColor } from '../src/js/ui/colors.js';
-import { dayDiff, decimal, temp, when } from '../src/js/ui/format.js';
+import { zoneOffsets } from '../src/js/sources/open-meteo.js';
+import {
+  clock,
+  dayDiff,
+  dayOfMonth,
+  decimal,
+  hour,
+  setOffsets,
+  temp,
+  weekday,
+  when,
+} from '../src/js/ui/format.js';
 import { HOUR, TZ } from './fixtures.js';
 
 describe('regions', () => {
@@ -65,6 +76,39 @@ describe('format', () => {
   it('writes decimals the Austrian way', () => {
     assert.equal(decimal(9.06), '9,1');
     assert.equal(decimal(12.4, 0), '12');
+  });
+
+  it('formats with the stored zone offsets exactly as Intl does, across a change of offset', () => {
+    // New York leaves summer time on 1 November 2026, Adelaide (+9:30/+10:30) enters it on 4 October.
+    for (const [tz, around] of [
+      ['America/New_York', '2026-11-01T06:00:00Z'],
+      ['Australia/Adelaide', '2026-10-03T16:30:00Z'],
+    ]) {
+      const center = Date.parse(around);
+      const intl = (options) => new Intl.DateTimeFormat('de-AT', { timeZone: tz, ...options });
+      const expected = (t) => [
+        intl({ hour: '2-digit', minute: '2-digit' }).format(t),
+        String(Number(intl({ hour: 'numeric', hourCycle: 'h23' }).format(t).replace(/\D/g, ''))),
+        intl({ weekday: 'short' }).format(t).replace('.', ''),
+        intl({ weekday: 'long' }).format(t),
+        intl({ day: 'numeric' }).format(t),
+        dayDiff(t, center, tz),
+      ];
+      const times = Array.from({ length: 4 * 72 }, (_, i) => center - 36 * HOUR + i * 15 * 60_000);
+      const before = times.map(expected);
+      const offsets = zoneOffsets(center - 3 * 24 * HOUR, center + 3 * 24 * HOUR, tz);
+      assert.equal(offsets.length, 3, `${tz}: one change`);
+      setOffsets(tz, offsets);
+      const after = times.map((t) => [
+        clock(t, tz),
+        hour(t, tz),
+        weekday(t, tz),
+        weekday(t, tz, 'long'),
+        dayOfMonth(t, tz),
+        dayDiff(t, center, tz),
+      ]);
+      assert.deepEqual(after, before, tz);
+    }
   });
 });
 

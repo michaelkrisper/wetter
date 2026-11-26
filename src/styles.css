@@ -369,22 +369,24 @@ h2 {
   stop-color: rgb(71 85 105);
 }
 
-/* Clouds sway, wider and faster in more wind; every other puff the other way. */
-.c-sway {
+/* Clouds sway, wider and faster in more wind; every other puff the other way.
+   Like the rain and the gusts only once the start is done (main.js adds
+   .is-animated), as these animations repaint the chart every frame. */
+.is-animated .c-sway {
   animation: c-sway-0 7s ease-in-out infinite alternate;
 }
 
-.c-sway-1 {
+.is-animated .c-sway-1 {
   animation-name: c-sway-1;
   animation-duration: 4s;
 }
 
-.c-sway-2 {
+.is-animated .c-sway-2 {
   animation-name: c-sway-2;
   animation-duration: 2s;
 }
 
-.c-sway-alt {
+.is-animated .c-sway-alt {
   animation-direction: alternate-reverse;
 }
 
@@ -424,13 +426,19 @@ h2 {
   stroke-linecap: round;
   stroke-width: 1.5;
   stroke-dasharray: 5 10;
-  animation: c-rain 0.25s linear infinite;
 }
 
 .c-flake {
   stroke: #e2e8f0;
   stroke-width: 2.4;
   stroke-dasharray: 0 9;
+}
+
+.is-animated .c-drop {
+  animation: c-rain 0.25s linear infinite;
+}
+
+.is-animated .c-flake {
   animation: c-snow 1s linear infinite;
 }
 
@@ -460,19 +468,25 @@ h2 {
   stroke-linecap: round;
   stroke-width: 1.4;
   stroke-dasharray: 56 56;
-  animation: c-gust 2.6s linear infinite;
 }
 
 .c-gust-2 {
   stroke-width: 1.8;
+}
+
+.is-animated .c-gust {
+  animation: c-gust 2.6s linear infinite;
+}
+
+.is-animated .c-gust-2 {
   animation-duration: 1.4s;
 }
 
-.c-gust-alt {
+.is-animated .c-gust-alt {
   animation-delay: -1.3s;
 }
 
-.c-gust-2.c-gust-alt {
+.is-animated .c-gust-2.c-gust-alt {
   animation-delay: -0.7s;
 }
 
@@ -487,10 +501,10 @@ h2 {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .c-sway,
-  .c-drop,
-  .c-flake,
-  .c-gust {
+  .is-animated .c-sway,
+  .is-animated .c-drop,
+  .is-animated .c-flake,
+  .is-animated .c-gust {
     animation: none;
   }
 }
@@ -519,7 +533,9 @@ h2 {
 }
 
 .c-star {
-  fill: #e0e7ff;
+  fill: none;
+  stroke: #e0e7ff;
+  stroke-linecap: round;
 }
 
 .c-day {
