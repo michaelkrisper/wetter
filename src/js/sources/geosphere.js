@@ -15,13 +15,17 @@ const NO_PRECIPITATION = 255;
 const TIMEOUT_MS = 20_000;
 const RAIN = 1;
 
-export async function fetchInca(lat, lon) {
+export function incaUrl(lat, lon) {
   const params = {
     parameters: 't2m,rr,pt',
     lat_lon: `${lat.toFixed(4)},${lon.toFixed(4)}`,
     output_format: 'geojson',
   };
-  const data = await getJson(`${ENDPOINT}?${query(params)}`, TIMEOUT_MS);
+  return `${ENDPOINT}?${query(params)}`;
+}
+
+export async function fetchInca(lat, lon) {
+  const data = await getJson(incaUrl(lat, lon), TIMEOUT_MS);
   const p = data.features?.[0]?.properties?.parameters;
   if (!p) throw new Error('INCA: empty response');
 
