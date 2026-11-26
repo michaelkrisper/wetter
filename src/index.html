@@ -89,6 +89,20 @@
     <section class="card days" aria-label="7 Tage">
       <ol id="days"></ol>
     </section>
+    <script>
+      // The last screen's header and days (stored by render() in main.js), drawn
+      // before the modules have loaded; main.js renders over them for now.
+      try {
+        const screen = JSON.parse(localStorage.getItem('wetter:screen'));
+        if (screen && Date.now() - screen.at < 3 * 3600_000) {
+          for (const id of ['place', 'temp', 'cond']) document.getElementById(id).textContent = screen[id];
+          document.getElementById('cond-icon').innerHTML = screen.icon;
+          document.getElementById('days').innerHTML = screen.days;
+          document.documentElement.style.setProperty('--glow', screen.glow);
+          document.body.classList.remove('is-empty');
+        }
+      } catch {}
+    </script>
 
     <!-- The deploy replaces "dev" with the version tag (deploy.yml). -->
     <p class="version">
