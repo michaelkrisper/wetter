@@ -86,6 +86,8 @@ describe('app in a browser', { skip: !chrome && 'no Chrome found', timeout: 60_0
   let profile;
   const errors = [];
   const requests = [];
+  // Requests to fail: the app's main module, the weather services.
+  const fail = { main: false, api: false };
 
   const evaluate = async (expression) => {
     const { result, exceptionDetails } = await page('Runtime.evaluate', {
@@ -136,7 +138,11 @@ describe('app in a browser', { skip: !chrome && 'no Chrome found', timeout: 60_0
 
     // The app's own files come from the server, everything else from the fixtures.
     const intercept = ({ requestId, request }) => {
-      if (request.url.startsWith(origin)) return page('Fetch.continueRequest', { requestId });
+      const own = request.url.startsWith(origin);
+      if (own ? fail.main && request.url.endsWith('/js/main.js') : fail.api) {
+        return page('Fetch.failRequest', { requestId, errorReason: 'Failed' });
+      }
+      if (own) return page('Fetch.continueRequest', { requestId });
       const url = new URL(request.url);
       requests.push(url);
       const body = answer(url);
@@ -264,6 +270,42 @@ describe('app in a browser', { skip: !chrome && 'no Chrome found', timeout: 60_0
     );
     await click('[data-tab=weather]');
     assert.equal(await evaluate(`document.getElementById('view-weather').hidden`), false);
+  });
+
+  it('shows the last header and days before the modules have loaded', async () => {
+    const shown = await evaluate(
+      `[document.getElementById('temp').textContent, document.getElementById('days').innerHTML]`,
+    );
+    fail.main = true;
+    await page('Page.reload');
+    await waitFor(`document.readyState === 'complete'`);
+    fail.main = false;
+    assert.equal(await text('#place'), 'Klagenfurt am Wörthersee');
+    assert.deepEqual(
+      await evaluate(
+        `[document.getElementById('temp').textContent, document.getElementById('days').innerHTML]`,
+      ),
+      shown,
+    );
+    assert.equal(await evaluate(`document.body.classList.contains('is-empty')`), false);
+  });
+
+  it('puts the skeleton back when the stored forecast cannot be used', async () => {
+    const before = errors.length;
+    fail.api = true;
+    await evaluate(`localStorage.setItem('wetter:forecast', '{"version":0}')`);
+    await page('Page.reload');
+    await waitFor(`document.getElementById('status').textContent === 'offline'`);
+    assert.equal(await text('#temp'), '–');
+    assert.equal(await text('#days'), '');
+    assert.equal(await evaluate(`document.body.classList.contains('is-empty')`), true);
+    fail.api = false;
+    // The failed refresh is logged on purpose.
+    errors.splice(before);
+    await page('Page.reload');
+    await waitFor(
+      `!document.body.classList.contains('is-empty') && document.querySelectorAll('#days li').length === 7`,
+    );
   });
 
   it('runs without errors', () => {

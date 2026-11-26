@@ -25,6 +25,15 @@ if (forecast?.version !== VERSION || distanceKm(forecast.location, place) > MOVE
   forecast = null;
 else setOffsets(forecast.timezone, forecast.offsets);
 
+// index.html drew the last screen from storage while the page loaded; render()
+// replaces it right away, but without a forecast for here the skeleton returns.
+if (!forecast && !document.body.classList.contains('is-empty')) {
+  $('temp').textContent = '–';
+  $('cond-icon').innerHTML = '';
+  $('cond').textContent = 'Wetter wird geladen';
+  $('days').innerHTML = '';
+}
+
 const chart = createChart($('chart'), {
   onSelect(next) {
     point = next;
@@ -64,6 +73,16 @@ function render() {
   renderHero(view);
   renderChartHead(view, { point, day });
   renderDays(view, day);
+  // For index.html to show at the next start before the modules have loaded.
+  storage.set('screen', {
+    at: Date.now(),
+    place: $('place').textContent,
+    temp: $('temp').textContent,
+    icon: $('cond-icon').innerHTML,
+    cond: $('cond').textContent,
+    glow: document.documentElement.style.getPropertyValue('--glow'),
+    days: $('days').innerHTML,
+  });
   chart.update(view);
   radar?.setLocation(place, view.timezone);
 }
