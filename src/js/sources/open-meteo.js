@@ -44,7 +44,7 @@ const REGIONAL = new Set([
   'precipitation_sum',
 ]);
 
-export async function fetchOpenMeteo(lat, lon, model) {
+export function openMeteoUrl(lat, lon, model) {
   const params = {
     latitude: lat.toFixed(4),
     longitude: lon.toFixed(4),
@@ -59,7 +59,11 @@ export async function fetchOpenMeteo(lat, lon, model) {
     timeformat: 'unixtime',
   };
   if (model) params.models = `best_match,${model}`;
-  const url = `${ENDPOINT}?${query(params)}`;
+  return `${ENDPOINT}?${query(params)}`;
+}
+
+export async function fetchOpenMeteo(lat, lon, model) {
+  const url = openMeteoUrl(lat, lon, model);
   // Without this source there is nothing to show, so a dropped request gets a second chance.
   const data = await getJson(url).catch(() => getJson(url));
   return normalize(data, model);

@@ -16,6 +16,23 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://api.open-meteo.com" crossorigin>
 <link rel="preconnect" href="https://dataset.api.hub.geosphere.at" crossorigin>
+<script>
+  // Starts the forecast requests of the last place while the modules load;
+  // sources/http.js takes them over. Before the first forecast: Graz, as
+  // forecast.js asks for it (test/startup.test.js). Above the stylesheet,
+  // which would hold the script back until it has loaded.
+  window.wetterEarly = {};
+  try {
+    const urls = JSON.parse(localStorage.getItem('wetter:requests')) ?? [
+      'https://api.open-meteo.com/v1/forecast?latitude=47.0707&longitude=15.4395&current=temperature_2m,weather_code,is_day&minutely_15=temperature_2m,precipitation,weather_code&hourly=temperature_2m,precipitation,precipitation_probability,weather_code,wind_speed_10m,cloud_cover,uv_index,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,uv_index_max,sunrise,sunset,moonrise,moonset,moon_phase&forecast_minutely_15=12&past_minutely_15=1&forecast_days=7&timezone=auto&timeformat=unixtime&models=best_match,geosphere_arome_austria',
+      'https://dataset.api.hub.geosphere.at/v1/timeseries/forecast/nowcast-v1-15min-1km?parameters=t2m,rr,pt&lat_lon=47.0707,15.4395&output_format=geojson',
+    ];
+    for (const url of urls) {
+      wetterEarly[url] = fetch(url);
+      wetterEarly[url].catch(() => {});
+    }
+  } catch {}
+</script>
 <link rel="stylesheet" href="styles.css">
 <link rel="modulepreload" href="js/config.js">
 <link rel="modulepreload" href="js/forecast.js">
@@ -34,6 +51,8 @@
 <link rel="modulepreload" href="js/ui/format.js">
 <link rel="modulepreload" href="js/ui/icons.js">
 <link rel="modulepreload" href="js/ui/render.js">
+<link rel="modulepreload" href="js/ui/picker.js">
+<link rel="modulepreload" href="js/sources/geocoding.js">
 <script type="module" src="js/main.js"></script>
 </head>
 <body class="is-empty">

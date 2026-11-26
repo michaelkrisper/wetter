@@ -1,5 +1,5 @@
 import { DEFAULT_LOCATION, MOVE_THRESHOLD_KM, REFRESH_MS } from './config.js';
-import { loadForecast } from './forecast.js';
+import { loadForecast, requestsFor } from './forecast.js';
 import { distanceKm, getPosition, placeName } from './location.js';
 import { snapshot } from './model.js';
 import * as storage from './storage.js';
@@ -70,6 +70,7 @@ async function refresh() {
   const id = ++request;
   loading = true;
   renderStatus();
+  storage.set('requests', requestsFor(place));
   const accept = (next) => {
     if (id !== request) return false;
     forecast = next;
@@ -90,6 +91,24 @@ async function refresh() {
   }
   loading = false;
   render();
+  started();
+}
+
+const idle = (fn) =>
+  window.requestIdleCallback ? requestIdleCallback(fn, { timeout: 2000 }) : setTimeout(fn, 200);
+
+const hasWorker = 'serviceWorker' in navigator && !['localhost', '127.0.0.1'].includes(location.hostname);
+
+// What the first forecast does not need waits until it is on screen (or the
+// request failed) and the page is idle: the service worker's install fetches
+// the whole shell.
+let isStarted = false;
+function started() {
+  if (isStarted) return;
+  isStarted = true;
+  idle(() => {
+    if (hasWorker) navigator.serviceWorker.register('./sw.js');
+  });
 }
 
 // A different place: its forecast replaces the old one, which is not shown
@@ -226,8 +245,8 @@ refresh();
 locate();
 if (location.hash === '#radar') showTab('radar');
 
-if ('serviceWorker' in navigator && !['localhost', '127.0.0.1'].includes(location.hostname)) {
+// Registered in started(); the browser may also update the worker on its own.
+if (hasWorker) {
   const hadController = Boolean(navigator.serviceWorker.controller);
   navigator.serviceWorker.addEventListener('controllerchange', () => hadController && location.reload());
-  navigator.serviceWorker.register('./sw.js');
 }

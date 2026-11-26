@@ -7,13 +7,28 @@
 
 import { NOWCAST_MINUTES } from './config.js';
 import { inBox, regionFor } from './regions.js';
-import { fetchInca, INCA_BOX } from './sources/geosphere.js';
-import { fetchOpenMeteo } from './sources/open-meteo.js';
+import { fetchInca, INCA_BOX, incaUrl } from './sources/geosphere.js';
+import { fetchOpenMeteo, openMeteoUrl } from './sources/open-meteo.js';
 
 export const NOWCASTS = {
-  inca: { label: 'INCA', detail: '1 km · 15 min', provider: 'geosphere', box: INCA_BOX, fetch: fetchInca },
+  inca: {
+    label: 'INCA',
+    detail: '1 km · 15 min',
+    provider: 'geosphere',
+    box: INCA_BOX,
+    fetch: fetchInca,
+    url: incaUrl,
+  },
   openmeteo: { label: 'Modell', detail: '15 min', provider: 'openmeteo' },
 };
+
+// The requests loadForecast() makes for a place, so index.html can start them
+// at the next start before the modules have loaded.
+export function requestsFor({ lat, lon }) {
+  const region = regionFor(lat, lon);
+  const nowcasts = region.nowcast.map((id) => NOWCASTS[id]).filter(({ box }) => inBox(lat, lon, box));
+  return [openMeteoUrl(lat, lon, region.model), ...nowcasts.map(({ url }) => url(lat, lon))];
+}
 
 // A nowcast must still reach the end of the window and must not be stale
 // (the services occasionally stop updating for a while).
